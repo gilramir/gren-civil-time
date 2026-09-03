@@ -25,6 +25,7 @@ Everything runs inside devbox; `gren` and node 22 are not on `PATH` otherwise.
 devbox run build    # compile the package
 devbox run docs     # check the doc comments parse
 devbox run test     # tests/run.sh: 36 checks
+devbox run gen      # regenerate the two generated test modules
 ```
 
 Format sources after editing them, especially after scripted edits:
@@ -66,11 +67,17 @@ this package to remember them.
 
 ## Tests
 
-`tests/src/Dates.gren` and `tests/src/Conformance.gren` are **generated**. Edit
-`tools/gen-dates.py` or `tools/gen-conformance.py` and re-run it from the
+`tests/src/Dates.gren` and `tests/src/Conformance.gren` are **generated**. The
+Gren lives in `tools/templates/`, as Jinja2 templates named after the modules
+they produce; the scripts in `tools/` supply the data and render them. Edit
+whichever of the four the change belongs in, run `devbox run gen` from the
 package root, then `gren-format`. `gen-conformance.py` reads `vendor/toml-test`,
-which is a submodule: `git submodule update --init` if the directory is empty. Both scripts reproduce their file byte for
-byte, so a diff after regenerating means the script and the file have drifted.
+which is a submodule: `git submodule update --init` if the directory is empty.
+Both scripts reproduce their file byte for byte, so a diff after regenerating
+means the sources and the file have drifted.
+
+The templates are not valid Gren on their own -- `gren-format` is for the output
+in `tests/src/`, never for `tools/templates/`.
 
 `tests/src/Clocks.gren` is hand written and covers what the TOML suite does not
 reach: the three zero offsets, the fraction, leap seconds, and the `Posix` round

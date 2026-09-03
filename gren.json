@@ -2,7 +2,7 @@
     "type": "package",
     "platform": "common",
     "name": "gilramir/gren-civil-time",
-    "summary": "Calendar dates and times of day, with no instant attached",
+    "summary": "Calendar dates and times of day, timezone-naive or offset-aware",
     "license": "ISC",
     "version": "1.0.0",
     "exposed-modules": [

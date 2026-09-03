@@ -104,9 +104,15 @@ git submodule pinned to one commit — pinned because the generator writes the
 counts it found into a guard test, so regenerating against a moving corpus would
 change the file and then fail on it.
 
+The Gren they emit is not embedded in the scripts. It sits in
+`tools/templates/`, one Jinja2 template per generated module, and each script
+collects the rows and renders its template.
+
 ```sh
-python3 tools/gen-dates.py           # needs nothing but Python
-python3 tools/gen-conformance.py     # needs the submodule
+devbox run gen                       # both of them
+
+python3 tools/gen-dates.py           # needs Python and Jinja2
+python3 tools/gen-conformance.py     # and the submodule
 ```
 
 **If you cloned without `--recurse-submodules`**, the tests still pass and only

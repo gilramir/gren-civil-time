@@ -1,0 +1,162 @@
+module Conformance exposing (conformanceSuite)
+
+{-| Every date and time in the official TOML test suite.
+
+The cases are lifted straight out of `toml-test`, filtered to the
+`files-toml-1.1.0` manifest: {{ good | length }} values that must parse, and {{ bad | length }} that must not.
+This is the suite the TOML parser will eventually be scored against, and these
+are the parts of it this package is responsible for -- so it is worth failing
+here, where the message says which spelling broke, rather than three packages
+later where it says a key had the wrong value.
+
+The expected strings are `toml-test`'s own, with one change: it writes a
+fraction to three places (`.600`) and this module strips trailing zeroes
+(`.6`). `toml-test` compares datetimes by parsing them rather than as text, so
+the two agree where it counts; the normalisation here is only so that this
+suite can compare strings and say something useful when they differ.
+
+The invalid cases are checked against all three of [`Civil.Date`](Civil-Date),
+[`Civil.Time`](Civil-Time) and [`Civil.DateTime`](Civil-DateTime), because a
+string that is not a date-time must not turn out to be a date either.
+
+@docs conformanceSuite
+
+-}
+
+import Array exposing (Array)
+import Civil.Date as Date
+import Civil.DateTime as DateTime
+import Civil.Time as Time
+import Expect
+import Maybe exposing (Maybe(..))
+import String
+import Task
+import Test.Runner.UnitNode as U
+
+
+type alias Good =
+    { kind : String, text : String, want : String, file : String }
+
+
+type alias Bad =
+    { text : String, file : String }
+
+
+good : Array Good
+good =
+{% for row in good %}
+    {{ "[" if loop.first else "," }} { kind = "{{ row.kind }}", text = "{{ row.text | gren_string }}", want = "{{ row.want | gren_string }}", file = "{{ row.file }}" }
+{% endfor %}
+    ]
+
+
+bad : Array Bad
+bad =
+{% for row in bad %}
+    {{ "[" if loop.first else "," }} { text = "{{ row.text | gren_string }}", file = "{{ row.file }}" }
+{% endfor %}
+    ]
+
+
+{-| Parse a value the way its type says to, and refuse it if the offset came
+out on the wrong side of the local/absolute line. A `datetime-local` that
+parsed with an offset is not the value the suite asked for.
+-}
+render : String -> String -> Maybe String
+render kind text =
+    when kind is
+        "date-local" ->
+            Date.fromString text
+                |> Maybe.map Date.toString
+
+        "time-local" ->
+            Time.fromString text
+                |> Maybe.map Time.toString
+
+        "datetime-local" ->
+            DateTime.fromString text
+                |> Maybe.andThen
+                    (\dt ->
+                        if DateTime.isLocal dt then
+                            Just (DateTime.toString dt)
+
+                        else
+                            Nothing
+                    )
+
+        _ ->
+            DateTime.fromString text
+                |> Maybe.andThen
+                    (\dt ->
+                        if DateTime.isLocal dt then
+                            Nothing
+
+                        else
+                            Just (DateTime.toString dt)
+                    )
+
+
+{-| Nothing in this package should read this string as anything.
+-}
+readsAsSomething : String -> Bool
+readsAsSomething text =
+    (Date.fromString text /= Nothing)
+        || (Time.fromString text /= Nothing)
+        || (DateTime.fromString text /= Nothing)
+
+
+{-| -}
+conformanceSuite : U.Suite
+conformanceSuite =
+    U.suite
+        { name = "Conformance"
+        , setUpSuite = U.noSuiteFixture
+        , tearDownSuite = U.noTearDown
+        , setUp = \_ -> Task.succeed {}
+        , tearDown = U.noTearDown
+        , tests =
+            -- A generated table that came out empty would pass every test
+            -- below it without running anything. These are the counts the
+            -- extractor reported; if they drift, the extractor changed.
+            [ U.test "the tables are the size toml-test says they are" <| \_ ->
+                Task.succeed
+                    (Expect.equal { good = {{ good | length }}, bad = {{ bad | length }} }
+                        { good = Array.length good, bad = Array.length bad }
+                    )
+            , U.test "every date-time toml-test accepts parses to the expected value" <| \_ ->
+                Task.succeed
+                    (Expect.equal []
+                        (good
+                            |> Array.keepIf (\g -> render g.kind g.text /= Just g.want)
+                            |> Array.map
+                                (\g ->
+                                    g.file
+                                        ++ ": "
+                                        ++ g.text
+                                        ++ " -> "
+                                        ++ describe (render g.kind g.text)
+                                        ++ ", wanted "
+                                        ++ g.want
+                                )
+                        )
+                    )
+            , U.test "and every one it rejects is rejected by all three modules" <| \_ ->
+                Task.succeed
+                    (Expect.equal []
+                        (bad
+                            |> Array.keepIf (\b -> readsAsSomething b.text)
+                            |> Array.map (\b -> b.file ++ ": " ++ b.text)
+                        )
+                    )
+            ]
+        }
+
+
+describe : Maybe String -> String
+describe result =
+    when result is
+        Just text ->
+            text
+
+        Nothing ->
+            "nothing"
