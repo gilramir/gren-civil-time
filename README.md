@@ -70,23 +70,63 @@ is not malformed. No arithmetic here pretends to know what it means:
 ## Tests
 
 ```sh
-git clone --recurse-submodules <this repo>
+git clone <this repo>     # --recurse-submodules is optional here; see below
 devbox run test
 ```
 
-36 checks. The calendar is checked against Python's `datetime.date` in both
-directions — its `toordinal` is Rata Die on the same epoch — over forty dates,
-ten chosen where things break and thirty drawn at random across the whole
-range. The parsing is checked against every date and time in the official
-[toml-test](https://github.com/toml-lang/toml-test) suite: 32 that must parse
-and 70 that must not.
+36 checks, in a few milliseconds, with **no submodule and no network needed**.
+The fixtures are committed, so a plain `git clone` is enough to run everything:
 
-Both tables are generated. `tools/gen-dates.py` needs nothing;
-`tools/gen-conformance.py` reads `vendor/toml-test`, a submodule pinned to a
-particular commit so that regenerating twice gives the same file. They
-rewrite their files, and the second one writes the row counts into a guard test
-so that an extractor which quietly stopped finding cases cannot produce a suite
-that passes.
+```
+Dates            ok    14/14  (3 ms)
+Clocks           ok    19/19  (2 ms)
+Conformance      ok     3/3   (1 ms)
+
+Ran 36 tests in 6 ms
+
+OK — 36 passed
+```
+
+What they check:
+
+| suite | against |
+|---|---|
+| `Dates` | Python's `datetime.date`, whose `toordinal` is Rata Die on the same epoch — forty dates, ten where things break and thirty at random across the whole range |
+| `Clocks` | the promises past what TOML exercises: the three zero offsets, the fraction, leap seconds, the `Posix` round trip on both sides of the epoch |
+| `Conformance` | every date and time in the official [toml-test](https://github.com/toml-lang/toml-test) suite — 32 that must parse and 70 that must not |
+
+### The submodule is only for regenerating
+
+`tests/src/Dates.gren` and `tests/src/Conformance.gren` are **generated**, and
+their contents are committed, which is why the tests above need nothing. The
+second generator reads the TOML test corpus, and that is `vendor/toml-test`, a
+git submodule pinned to one commit — pinned because the generator writes the
+counts it found into a guard test, so regenerating against a moving corpus would
+change the file and then fail on it.
+
+```sh
+python3 tools/gen-dates.py           # needs nothing but Python
+python3 tools/gen-conformance.py     # needs the submodule
+```
+
+**If you cloned without `--recurse-submodules`**, the tests still pass and only
+the second generator stops:
+
+```
+FileNotFoundError: [Errno 2] No such file or directory:
+    'vendor/toml-test/tests/files-toml-1.1.0'
+```
+
+Fix it in place, no re-clone needed:
+
+```sh
+git submodule update --init
+```
+
+Both scripts reproduce their file byte for byte, so a diff after regenerating
+means the script and the file have drifted apart. `gen-conformance.py` also
+writes its row counts into a guard test, so an extractor that quietly stopped
+finding cases cannot produce a suite that passes without checking anything.
 
 ## License
 
