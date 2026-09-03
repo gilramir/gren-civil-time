@@ -1,0 +1,258 @@
+module Conformance exposing (conformanceSuite)
+
+{-| Every date and time in the official TOML test suite.
+
+The cases are lifted straight out of `toml-test`, filtered to the
+`files-toml-1.1.0` manifest: 32 values that must parse, and 70 that must not.
+This is the suite the TOML parser will eventually be scored against, and these
+are the parts of it this package is responsible for -- so it is worth failing
+here, where the message says which spelling broke, rather than three packages
+later where it says a key had the wrong value.
+
+The expected strings are `toml-test`'s own, with one change: it writes a
+fraction to three places (`.600`) and this module strips trailing zeroes
+(`.6`). `toml-test` compares datetimes by parsing them rather than as text, so
+the two agree where it counts; the normalisation here is only so that this
+suite can compare strings and say something useful when they differ.
+
+The invalid cases are checked against all three of [`Civil.Date`](Civil-Date),
+[`Civil.Time`](Civil-Time) and [`Civil.DateTime`](Civil-DateTime), because a
+string that is not a date-time must not turn out to be a date either.
+
+@docs conformanceSuite
+
+-}
+
+import Array exposing (Array)
+import Civil.Date as Date
+import Civil.DateTime as DateTime
+import Civil.Time as Time
+import Expect
+import Maybe exposing (Maybe(..))
+import String
+import Task
+import Test.Runner.UnitNode as U
+
+
+type alias Good =
+    { kind : String, text : String, want : String, file : String }
+
+
+type alias Bad =
+    { text : String, file : String }
+
+
+good : Array Good
+good =
+    [ { kind = "datetime", text = "1987-07-05t17:45:00z", want = "1987-07-05T17:45:00Z", file = "valid/datetime/datetime.toml" }
+    , { kind = "datetime", text = "1987-07-05 17:45:00Z", want = "1987-07-05T17:45:00Z", file = "valid/datetime/datetime.toml" }
+    , { kind = "date-local", text = "0001-01-01", want = "0001-01-01", file = "valid/datetime/edge.toml" }
+    , { kind = "datetime-local", text = "0001-01-01 00:00:00", want = "0001-01-01T00:00:00", file = "valid/datetime/edge.toml" }
+    , { kind = "datetime", text = "0001-01-01 00:00:00Z", want = "0001-01-01T00:00:00Z", file = "valid/datetime/edge.toml" }
+    , { kind = "date-local", text = "9999-12-31", want = "9999-12-31", file = "valid/datetime/edge.toml" }
+    , { kind = "datetime-local", text = "9999-12-31 23:59:59", want = "9999-12-31T23:59:59", file = "valid/datetime/edge.toml" }
+    , { kind = "datetime", text = "9999-12-31 23:59:59Z", want = "9999-12-31T23:59:59Z", file = "valid/datetime/edge.toml" }
+    , { kind = "date-local", text = "2000-02-29", want = "2000-02-29", file = "valid/datetime/leap-year.toml" }
+    , { kind = "datetime", text = "2000-02-29 15:15:15Z", want = "2000-02-29T15:15:15Z", file = "valid/datetime/leap-year.toml" }
+    , { kind = "datetime-local", text = "2000-02-29 15:15:15", want = "2000-02-29T15:15:15", file = "valid/datetime/leap-year.toml" }
+    , { kind = "date-local", text = "2024-02-29", want = "2024-02-29", file = "valid/datetime/leap-year.toml" }
+    , { kind = "datetime", text = "2024-02-29 15:15:15Z", want = "2024-02-29T15:15:15Z", file = "valid/datetime/leap-year.toml" }
+    , { kind = "datetime-local", text = "2024-02-29 15:15:15", want = "2024-02-29T15:15:15", file = "valid/datetime/leap-year.toml" }
+    , { kind = "date-local", text = "1987-07-05", want = "1987-07-05", file = "valid/datetime/local-date.toml" }
+    , { kind = "time-local", text = "17:45:00", want = "17:45:00", file = "valid/datetime/local-time.toml" }
+    , { kind = "time-local", text = "10:32:00.555", want = "10:32:00.555", file = "valid/datetime/local-time.toml" }
+    , { kind = "datetime-local", text = "1987-07-05T17:45:00", want = "1987-07-05T17:45:00", file = "valid/datetime/local.toml" }
+    , { kind = "datetime-local", text = "1977-12-21T10:32:00.555", want = "1977-12-21T10:32:00.555", file = "valid/datetime/local.toml" }
+    , { kind = "datetime-local", text = "1987-07-05 17:45:00", want = "1987-07-05T17:45:00", file = "valid/datetime/local.toml" }
+    , { kind = "datetime", text = "1987-07-05T17:45:56.123Z", want = "1987-07-05T17:45:56.123Z", file = "valid/datetime/milliseconds.toml" }
+    , { kind = "datetime", text = "1987-07-05T17:45:56.6Z", want = "1987-07-05T17:45:56.6Z", file = "valid/datetime/milliseconds.toml" }
+    , { kind = "datetime", text = "1987-07-05T17:45:56.123+08:00", want = "1987-07-05T17:45:56.123+08:00", file = "valid/datetime/milliseconds.toml" }
+    , { kind = "datetime", text = "1987-07-05T17:45:56.6+08:00", want = "1987-07-05T17:45:56.6+08:00", file = "valid/datetime/milliseconds.toml" }
+    , { kind = "time-local", text = "13:37", want = "13:37:00", file = "valid/datetime/no-seconds.toml" }
+    , { kind = "datetime", text = "1979-05-27 07:32Z", want = "1979-05-27T07:32:00Z", file = "valid/datetime/no-seconds.toml" }
+    , { kind = "datetime", text = "1979-05-27 07:32-07:00", want = "1979-05-27T07:32:00-07:00", file = "valid/datetime/no-seconds.toml" }
+    , { kind = "datetime-local", text = "1979-05-27T07:32", want = "1979-05-27T07:32:00", file = "valid/datetime/no-seconds.toml" }
+    , { kind = "datetime", text = "1987-07-05T17:45:56+13:00", want = "1987-07-05T17:45:56+13:00", file = "valid/datetime/timezone.toml" }
+    , { kind = "datetime", text = "1987-07-05T17:45:56+12:00", want = "1987-07-05T17:45:56+12:00", file = "valid/datetime/timezone.toml" }
+    , { kind = "datetime", text = "1987-07-05T17:45:56-05:00", want = "1987-07-05T17:45:56-05:00", file = "valid/datetime/timezone.toml" }
+    , { kind = "datetime", text = "1987-07-05T17:45:56Z", want = "1987-07-05T17:45:56Z", file = "valid/datetime/timezone.toml" }
+    ]
+
+
+bad : Array Bad
+bad =
+    [ { text = "1997-09-00T09:09:09.09Z", file = "invalid/datetime/day-zero.toml" }
+    , { text = "2100-02-29T15:15:15Z", file = "invalid/datetime/feb-29.toml" }
+    , { text = "1988-02-30T15:15:15Z", file = "invalid/datetime/feb-30.toml" }
+    , { text = "2006-01-01T24:00:00-00:00", file = "invalid/datetime/hour-over.toml" }
+    , { text = "02026-05-07", file = "invalid/datetime/leading-zero-date.toml" }
+    , { text = "02026-05-07T14:15:16Z", file = "invalid/datetime/leading-zero-datetime.toml" }
+    , { text = "2006-01-32T00:00:00-00:00", file = "invalid/datetime/mday-over.toml" }
+    , { text = "2006-01-00T00:00:00-00:00", file = "invalid/datetime/mday-under.toml" }
+    , { text = "2006-01-01T00:60:00-00:00", file = "invalid/datetime/minute-over.toml" }
+    , { text = "2006-13-01T00:00:00-00:00", file = "invalid/datetime/month-over.toml" }
+    , { text = "2007-00-01T00:00:00-00:00", file = "invalid/datetime/month-under.toml" }
+    , { text = "1997-09-0909:09:09", file = "invalid/datetime/no-date-time-sep.toml" }
+    , { text = "1987-7-05T17:45:00Z", file = "invalid/datetime/no-leads-month.toml" }
+    , { text = "1987-07-5T17:45:00.12Z", file = "invalid/datetime/no-leads-with-milli.toml" }
+    , { text = "1987-7-05T17:45:00Z", file = "invalid/datetime/no-leads.toml" }
+    , { text = "1987-07-0517:45:00Z", file = "invalid/datetime/no-t.toml" }
+    , { text = "199709-09", file = "invalid/datetime/no-year-month-sep.toml" }
+    , { text = "1997-09-09T09:09:09.09+09:9", file = "invalid/datetime/offset-minus-minute-1digit.toml" }
+    , { text = "1997-09-09T09:09:09.09+0909", file = "invalid/datetime/offset-minus-no-hour-minute-sep.toml" }
+    , { text = "1997-09-09T09:09:09.09+", file = "invalid/datetime/offset-minus-no-hour-minute.toml" }
+    , { text = "1997-09-09T09:09:09.09+09", file = "invalid/datetime/offset-minus-no-minute.toml" }
+    , { text = "1985-06-18 17:04:07+25:00", file = "invalid/datetime/offset-overflow-hour.toml" }
+    , { text = "1985-06-18 17:04:07+12:60", file = "invalid/datetime/offset-overflow-minute.toml" }
+    , { text = "1997-09-09T09:09:09.09+09:9", file = "invalid/datetime/offset-plus-minute-1digit.toml" }
+    , { text = "1997-09-09T09:09:09.09+0909", file = "invalid/datetime/offset-plus-no-hour-minute-sep.toml" }
+    , { text = "1997-09-09T09:09:09.09+", file = "invalid/datetime/offset-plus-no-hour-minute.toml" }
+    , { text = "1997-09-09T09:09:09.09+09", file = "invalid/datetime/offset-plus-no-minute.toml" }
+    , { text = "T", file = "invalid/datetime/only-T.toml" }
+    , { text = "TZ", file = "invalid/datetime/only-TZ.toml" }
+    , { text = "T.", file = "invalid/datetime/only-Tdot.toml" }
+    , { text = "2006-01-01T00:00:61-00:00", file = "invalid/datetime/second-over.toml" }
+    , { text = "1997-09-09T09:09:09.", file = "invalid/datetime/second-trailing-dot.toml" }
+    , { text = "2016-09-09T09:09:09.Z", file = "invalid/datetime/second-trailing-dotz.toml" }
+    , { text = "2023-10-01T1:32:00Z", file = "invalid/datetime/time-no-leads.toml" }
+    , { text = "2020-01-01x", file = "invalid/datetime/trailing-x.toml" }
+    , { text = "10000-01-01", file = "invalid/datetime/y10k-date.toml" }
+    , { text = "10000-01-01 00:00:00z", file = "invalid/datetime/y10k-datetime.toml" }
+    , { text = "1997-09-9", file = "invalid/local-date/day-1digit.toml" }
+    , { text = "2100-02-29", file = "invalid/local-date/feb-29.toml" }
+    , { text = "1988-02-30", file = "invalid/local-date/feb-30.toml" }
+    , { text = "2006-01-32", file = "invalid/local-date/mday-over.toml" }
+    , { text = "2006-01-00", file = "invalid/local-date/mday-under.toml" }
+    , { text = "2006-13-01", file = "invalid/local-date/month-over.toml" }
+    , { text = "2007-00-01", file = "invalid/local-date/month-under.toml" }
+    , { text = "1987-07-5", file = "invalid/local-date/no-leads-with-milli.toml" }
+    , { text = "1987-7-05", file = "invalid/local-date/no-leads.toml" }
+    , { text = "2006-01-30T", file = "invalid/local-date/trailing-t.toml" }
+    , { text = "10000-01-01", file = "invalid/local-date/y10k.toml" }
+    , { text = "199-09-09", file = "invalid/local-date/year-3digits.toml" }
+    , { text = "24:00:00", file = "invalid/local-time/hour-over.toml" }
+    , { text = "00:60:00", file = "invalid/local-time/minute-over.toml" }
+    , { text = "00:00:61", file = "invalid/local-time/second-over.toml" }
+    , { text = "1:32:00", file = "invalid/local-time/time-no-leads-01.toml" }
+    , { text = "01:32:0", file = "invalid/local-time/time-no-leads-02.toml" }
+    , { text = "12:13:14.", file = "invalid/local-time/trailing-dot.toml" }
+    , { text = "12:13:14..", file = "invalid/local-time/trailing-dotdot.toml" }
+    , { text = "2100-02-29T15:15:15", file = "invalid/local-datetime/feb-29.toml" }
+    , { text = "1988-02-30T15:15:15", file = "invalid/local-datetime/feb-30.toml" }
+    , { text = "2006-01-01T24:00:00", file = "invalid/local-datetime/hour-over.toml" }
+    , { text = "2006-01-32T00:00:00", file = "invalid/local-datetime/mday-over.toml" }
+    , { text = "2006-01-00T00:00:00", file = "invalid/local-datetime/mday-under.toml" }
+    , { text = "2006-01-01T00:60:00", file = "invalid/local-datetime/minute-over.toml" }
+    , { text = "2006-13-01T00:00:00", file = "invalid/local-datetime/month-over.toml" }
+    , { text = "2007-00-01T00:00:00", file = "invalid/local-datetime/month-under.toml" }
+    , { text = "1987-07-5T17:45:00.12", file = "invalid/local-datetime/no-leads-with-milli.toml" }
+    , { text = "1987-7-05T17:45:00", file = "invalid/local-datetime/no-leads.toml" }
+    , { text = "1987-07-0517:45:00", file = "invalid/local-datetime/no-t.toml" }
+    , { text = "2006-01-01T00:00:61", file = "invalid/local-datetime/second-over.toml" }
+    , { text = "2023-10-01T1:32:00Z", file = "invalid/local-datetime/time-no-leads.toml" }
+    , { text = "10000-01-01 00:00:00", file = "invalid/local-datetime/y10k.toml" }
+    ]
+
+
+{-| Parse a value the way its type says to, and refuse it if the offset came
+out on the wrong side of the local/absolute line. A `datetime-local` that
+parsed with an offset is not the value the suite asked for.
+-}
+render : String -> String -> Maybe String
+render kind text =
+    when kind is
+        "date-local" ->
+            Date.fromString text
+                |> Maybe.map Date.toString
+
+        "time-local" ->
+            Time.fromString text
+                |> Maybe.map Time.toString
+
+        "datetime-local" ->
+            DateTime.fromString text
+                |> Maybe.andThen
+                    (\dt ->
+                        if DateTime.isLocal dt then
+                            Just (DateTime.toString dt)
+
+                        else
+                            Nothing
+                    )
+
+        _ ->
+            DateTime.fromString text
+                |> Maybe.andThen
+                    (\dt ->
+                        if DateTime.isLocal dt then
+                            Nothing
+
+                        else
+                            Just (DateTime.toString dt)
+                    )
+
+
+{-| Nothing in this package should read this string as anything.
+-}
+readsAsSomething : String -> Bool
+readsAsSomething text =
+    (Date.fromString text /= Nothing)
+        || (Time.fromString text /= Nothing)
+        || (DateTime.fromString text /= Nothing)
+
+
+{-| -}
+conformanceSuite : U.Suite
+conformanceSuite =
+    U.suite
+        { name = "Conformance"
+        , setUpSuite = U.noSuiteFixture
+        , tearDownSuite = U.noTearDown
+        , setUp = \_ -> Task.succeed {}
+        , tearDown = U.noTearDown
+        , tests =
+            -- A generated table that came out empty would pass every test
+            -- below it without running anything. These are the counts the
+            -- extractor reported; if they drift, the extractor changed.
+            [ U.test "the tables are the size toml-test says they are" <| \_ ->
+                Task.succeed
+                    (Expect.equal { good = 32, bad = 70 }
+                        { good = Array.length good, bad = Array.length bad }
+                    )
+            , U.test "every date-time toml-test accepts parses to the expected value" <| \_ ->
+                Task.succeed
+                    (Expect.equal []
+                        (good
+                            |> Array.keepIf (\g -> render g.kind g.text /= Just g.want)
+                            |> Array.map
+                                (\g ->
+                                    g.file
+                                        ++ ": "
+                                        ++ g.text
+                                        ++ " -> "
+                                        ++ describe (render g.kind g.text)
+                                        ++ ", wanted "
+                                        ++ g.want
+                                )
+                        )
+                    )
+            , U.test "and every one it rejects is rejected by all three modules" <| \_ ->
+                Task.succeed
+                    (Expect.equal []
+                        (bad
+                            |> Array.keepIf (\b -> readsAsSomething b.text)
+                            |> Array.map (\b -> b.file ++ ": " ++ b.text)
+                        )
+                    )
+            ]
+        }
+
+
+describe : Maybe String -> String
+describe result =
+    when result is
+        Just text ->
+            text
+
+        Nothing ->
+            "nothing"

@@ -1,0 +1,33 @@
+module Main exposing (main)
+
+{-| The test suite.
+
+  - `Dates` is the calendar, checked against Python's `datetime.date` in both
+    directions across the whole representable range.
+  - `Clocks` is the promises the two clock modules make past what TOML
+    exercises: the three zero offsets, the fraction, and the Posix round trip.
+  - `Conformance` is every date and time in the official TOML test suite, the
+    ones that must parse and the ones that must not.
+
+Run with `./run.sh`.
+
+-}
+
+import Clocks exposing (clocksSuite)
+import Conformance exposing (conformanceSuite)
+import Dates exposing (datesSuite)
+import Node
+import Test.Runner.UnitNode as U
+
+
+main : Node.SimpleProgram a
+main =
+    U.run
+        { name = "gren-civil-time"
+        , version = "1.0.0"
+        , suites =
+            [ datesSuite
+            , clocksSuite
+            , conformanceSuite
+            ]
+        }

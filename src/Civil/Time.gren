@@ -1,0 +1,362 @@
+module Civil.Time exposing
+    ( Time
+    , fromParts, midnight
+    , hour, minute, second, fraction, millisecond, nanosecond, secondOfDay
+    , fromString, toString, toStringWithPlaces
+    )
+
+{-| A time of day, with no date and no time zone.
+
+`17:45:00` is a time of day. It is not an instant and it is not a duration: it
+happens once a day everywhere, at a different moment in each place, and on the
+days a zone shifts it may happen twice or not at all. What it is instead is a
+reading on a clock, which is what a `partial-time` in RFC 3339 is and what
+someone means when they write down when a shop opens.
+
+
+## Seconds are optional, fractions are not limited
+
+RFC 3339 makes the seconds field optional and puts no bound on the digits after
+the decimal point, and this module follows it. `13:37` parses, and reads back as
+`13:37:00`; the normal form always has all three fields.
+
+The fraction is kept exactly, however many digits it had, because throwing away
+the twelfth digit is not this module's decision to make. What it does throw away
+is trailing zeroes, so that `==` is equality of the time rather than of the
+spelling: `10:32:00.5` and `10:32:00.50` are the same value. If you need the
+spelling back, keep the source text; a value cannot hold both.
+
+
+## Leap seconds
+
+A second of `60` is accepted, because RFC 3339 allows it and a timestamp that
+records one is not malformed. It is stored and written back as `60`. This module
+does no arithmetic that would have to decide what it means --
+[`secondOfDay`](#secondOfDay) will return `86400` for `23:59:60`, and that is
+the honest answer rather than a useful one.
+
+@docs Time
+
+
+## Creating
+
+@docs fromParts, midnight
+
+
+## Reading
+
+@docs hour, minute, second, fraction, millisecond, nanosecond, secondOfDay
+
+
+## Strings
+
+@docs fromString, toString, toStringWithPlaces
+
+-}
+
+import Basics exposing (..)
+import Char
+import Maybe exposing (Maybe(..))
+import String
+
+
+{-| A reading on a clock.
+-}
+type Time
+    = Time
+        { hour : Int
+        , minute : Int
+        , second : Int
+        , fraction : String
+        }
+
+
+
+-- CREATING
+
+
+{-| A time from its parts. The fraction is the digits that would follow the
+decimal point, without the point itself; `""` for none.
+
+    Time.fromParts { hour = 10, minute = 32, second = 0, fraction = "555" }
+        |> Maybe.map Time.toString
+    --> Just "10:32:00.555"
+
+`Nothing` if the hour is outside 0 to 23, the minute outside 0 to 59, the second
+outside 0 to 60, or the fraction is anything but digits.
+
+Trailing zeroes come off the fraction, so this is the same value as one built
+with `"5550"`.
+
+-}
+fromParts : { hour : Int, minute : Int, second : Int, fraction : String } -> Maybe Time
+fromParts parts =
+    if parts.hour < 0 || parts.hour > 23 then
+        Nothing
+
+    else if parts.minute < 0 || parts.minute > 59 then
+        Nothing
+
+    else if parts.second < 0 || parts.second > 60 then
+        Nothing
+
+    else if not (String.all Char.isDigit parts.fraction) then
+        Nothing
+
+    else
+        Just
+            (Time
+                { hour = parts.hour
+                , minute = parts.minute
+                , second = parts.second
+                , fraction = trimZeroes parts.fraction
+                }
+            )
+
+
+{-| `00:00:00`.
+-}
+midnight : Time
+midnight =
+    Time { hour = 0, minute = 0, second = 0, fraction = "" }
+
+
+trimZeroes : String -> String
+trimZeroes text =
+    if String.endsWith "0" text then
+        trimZeroes (String.dropLast 1 text)
+
+    else
+        text
+
+
+
+-- READING
+
+
+{-| The hour, 0 to 23.
+-}
+hour : Time -> Int
+hour (Time parts) =
+    parts.hour
+
+
+{-| The minute, 0 to 59.
+-}
+minute : Time -> Int
+minute (Time parts) =
+    parts.minute
+
+
+{-| The second, 0 to 60. Sixty is a leap second.
+-}
+second : Time -> Int
+second (Time parts) =
+    parts.second
+
+
+{-| The digits after the decimal point, without the point, with trailing zeroes
+already removed. `""` when there is no fraction.
+
+    Time.fromString "10:32:00.5500" |> Maybe.map Time.fraction
+    --> Just "55"
+
+-}
+fraction : Time -> String
+fraction (Time parts) =
+    parts.fraction
+
+
+{-| The fraction as whole milliseconds, truncated.
+
+    Time.fromString "10:32:00.5559" |> Maybe.map Time.millisecond
+    --> Just 555
+
+-}
+millisecond : Time -> Int
+millisecond time =
+    fractionAsInt 3 time
+
+
+{-| The fraction as whole nanoseconds, truncated. Digits past the ninth are
+lost, which is the point of the function; [`fraction`](#fraction) is the one
+that keeps them.
+
+    Time.fromString "10:32:00.5" |> Maybe.map Time.nanosecond
+    --> Just 500000000
+
+-}
+nanosecond : Time -> Int
+nanosecond time =
+    fractionAsInt 9 time
+
+
+fractionAsInt : Int -> Time -> Int
+fractionAsInt places (Time parts) =
+    if parts.fraction == "" then
+        0
+
+    else
+        parts.fraction
+            |> String.takeFirst places
+            |> String.padRight places '0'
+            |> String.toInt
+            |> Maybe.withDefault 0
+
+
+{-| Seconds since midnight, ignoring the fraction.
+
+    Time.fromString "01:00:00" |> Maybe.map Time.secondOfDay
+    --> Just 3600
+
+A leap second gives `86400`, one past the end of the day. See the note above.
+
+-}
+secondOfDay : Time -> Int
+secondOfDay (Time parts) =
+    parts.hour * 3600 + parts.minute * 60 + parts.second
+
+
+
+-- STRINGS
+
+
+{-| Read an `HH:MM`, `HH:MM:SS`, or `HH:MM:SS.fff` time.
+
+    Time.fromString "13:37" |> Maybe.map Time.toString
+    --> Just "13:37:00"
+
+Each field has to be exactly two digits, the fraction at least one, and the
+whole string has to be the time. All of these are `Nothing`:
+
+    Time.fromString "1:37:00"    --> Nothing
+    Time.fromString "13:37:00."  --> Nothing
+    Time.fromString "133700"     --> Nothing
+    Time.fromString "13:37:00Z"  --> Nothing
+
+-}
+fromString : String -> Maybe Time
+fromString str =
+    let
+        { first = clock, rest = fractionPart } =
+            when String.firstIndexOf "." str is
+                Just at ->
+                    { first = String.takeFirst at str
+                    , rest = String.dropFirst (at + 1) str
+                    }
+
+                Nothing ->
+                    { first = str, rest = "" }
+
+        fractionOk =
+            when String.firstIndexOf "." str is
+                Just _ ->
+                    fractionPart /= "" && String.all Char.isDigit fractionPart
+
+                Nothing ->
+                    True
+    in
+    if not fractionOk then
+        Nothing
+
+    else
+        when String.split ":" clock is
+            [ hourText, minuteText ] ->
+                -- RFC 3339 hangs time-secfrac off time-second, so a fraction
+                -- with no seconds to attach to is not a time.
+                if fractionPart == "" then
+                    build hourText minuteText "00" ""
+
+                else
+                    Nothing
+
+            [ hourText, minuteText, secondText ] ->
+                build hourText minuteText secondText fractionPart
+
+            _ ->
+                Nothing
+
+
+build : String -> String -> String -> String -> Maybe Time
+build hourText minuteText secondText fractionText =
+    if String.count hourText /= 2 || String.count minuteText /= 2 || String.count secondText /= 2 then
+        Nothing
+
+    else
+        Maybe.map3
+            (\h m s ->
+                { hour = h, minute = m, second = s, fraction = fractionText }
+            )
+            (digits hourText)
+            (digits minuteText)
+            (digits secondText)
+            |> Maybe.andThen fromParts
+
+
+digits : String -> Maybe Int
+digits text =
+    if String.all Char.isDigit text then
+        String.toInt text
+
+    else
+        Nothing
+
+
+{-| Write an `HH:MM:SS` time, with `.fff` after it when there is a fraction.
+
+    Time.fromString "13:37" |> Maybe.map Time.toString
+    --> Just "13:37:00"
+
+The seconds are always written, even when they were not read, because that is
+the normal form. The fraction is written with the digits it has left after the
+trailing zeroes came off.
+
+-}
+toString : Time -> String
+toString (Time parts) =
+    let
+        clock =
+            pad parts.hour ++ ":" ++ pad parts.minute ++ ":" ++ pad parts.second
+    in
+    if parts.fraction == "" then
+        clock
+
+    else
+        clock ++ "." ++ parts.fraction
+
+
+{-| Write an `HH:MM:SS` time with the fraction padded or truncated to a fixed
+number of places.
+
+    Time.fromString "13:37" |> Maybe.map (Time.toStringWithPlaces 3)
+    --> Just "13:37:00.000"
+
+    Time.fromString "10:32:00.5" |> Maybe.map (Time.toStringWithPlaces 3)
+    --> Just "10:32:00.500"
+
+Zero places writes no decimal point at all. This is for talking to something
+that insists on milliseconds; [`toString`](#toString) is the one to use
+otherwise.
+
+-}
+toStringWithPlaces : Int -> Time -> String
+toStringWithPlaces places (Time parts) =
+    let
+        clock =
+            pad parts.hour ++ ":" ++ pad parts.minute ++ ":" ++ pad parts.second
+    in
+    if places <= 0 then
+        clock
+
+    else
+        clock
+            ++ "."
+            ++ (parts.fraction
+                    |> String.takeFirst places
+                    |> String.padRight places '0'
+               )
+
+
+pad : Int -> String
+pad n =
+    String.padLeft 2 '0' (String.fromInt n)

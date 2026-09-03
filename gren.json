@@ -1,0 +1,18 @@
+{
+    "type": "package",
+    "platform": "common",
+    "name": "gilramir/gren-civil-time",
+    "summary": "Calendar dates and times of day, with no instant attached",
+    "license": "ISC",
+    "version": "1.0.0",
+    "exposed-modules": [
+        "Civil.Date",
+        "Civil.Time",
+        "Civil.Offset",
+        "Civil.DateTime"
+    ],
+    "gren-version": "0.6.0 <= v < 0.7.0",
+    "dependencies": {
+        "gren-lang/core": "7.4.0 <= v < 8.0.0"
+    }
+}

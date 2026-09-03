@@ -1,0 +1,317 @@
+module Civil.Offset exposing
+    ( Offset
+    , zulu, plus, minus, fromMinutes
+    , toMinutes, isZulu, isNegative, hours, minutes
+    , fromString, toString
+    )
+
+{-| A fixed offset from UTC, as a date-time was written down.
+
+This is not a time zone. `America/Denver` is a time zone: a set of rules that
+says the offset is -07:00 in January and -06:00 in June, and that has changed
+several times since 1883. `-07:00` is an offset: a number of minutes, with no
+rule and no history behind it. A timestamp carries the second, never the first
+-- which is why you cannot recover the zone from a timestamp, and why this
+module stops here.
+
+
+## Three ways to write zero
+
+RFC 3339 gives `Z`, `+00:00` and `-00:00` three separate meanings, and this
+module keeps them apart:
+
+  - `Z` is UTC, asserted.
+  - `+00:00` is an offset that happens to be zero.
+  - `-00:00` is the offset the RFC reserves for "the local offset is unknown"
+    (section 4.3).
+
+All three are zero minutes from UTC, so [`toMinutes`](#toMinutes) returns `0`
+for all three, but `==` tells them apart. If you want to compare the numbers
+rather than the spellings, compare `toMinutes`.
+
+
+## Range
+
+`-23:59` through `+23:59`, which is what TOML's grammar allows. The constructors
+return `Nothing` outside it.
+
+@docs Offset
+
+
+## Creating
+
+@docs zulu, plus, minus, fromMinutes
+
+
+## Reading
+
+@docs toMinutes, isZulu, isNegative, hours, minutes
+
+
+## Strings
+
+@docs fromString, toString
+
+-}
+
+import Basics exposing (..)
+import Char
+import Maybe exposing (Maybe(..))
+import String
+
+
+{-| An offset from UTC.
+-}
+type Offset
+    = Zulu
+    | Plus { hours : Int, minutes : Int }
+    | Minus { hours : Int, minutes : Int }
+
+
+
+-- CREATING
+
+
+{-| UTC, written `Z`.
+
+    Offset.toString Offset.zulu
+    --> "Z"
+
+-}
+zulu : Offset
+zulu =
+    Zulu
+
+
+{-| An offset east of UTC, from hours and minutes.
+
+    Offset.plus { hours = 5, minutes = 30 }
+        |> Maybe.map Offset.toString
+    --> Just "+05:30"
+
+`Nothing` if the hours are outside 0-23 or the minutes outside 0-59.
+
+-}
+plus : { hours : Int, minutes : Int } -> Maybe Offset
+plus parts =
+    if inRange parts then
+        Just (Plus parts)
+
+    else
+        Nothing
+
+
+{-| An offset west of UTC, from hours and minutes.
+
+    Offset.minus { hours = 7, minutes = 0 }
+        |> Maybe.map Offset.toString
+    --> Just "-07:00"
+
+Note that `minus { hours = 0, minutes = 0 }` is `-00:00`, which RFC 3339 reads
+as "offset unknown" rather than as UTC. If you meant UTC, use [`zulu`](#zulu).
+
+-}
+minus : { hours : Int, minutes : Int } -> Maybe Offset
+minus parts =
+    if inRange parts then
+        Just (Minus parts)
+
+    else
+        Nothing
+
+
+inRange : { hours : Int, minutes : Int } -> Bool
+inRange parts =
+    parts.hours >= 0 && parts.hours <= 23 && parts.minutes >= 0 && parts.minutes <= 59
+
+
+{-| An offset from a signed number of minutes east of UTC.
+
+    Offset.fromMinutes -420 |> Maybe.map Offset.toString
+    --> Just "-07:00"
+
+Zero gives `+00:00`, not `Z` and not `-00:00`; those two have to be asked for
+by name. `Nothing` outside -1439 to 1439.
+
+-}
+fromMinutes : Int -> Maybe Offset
+fromMinutes total =
+    if total >= 0 then
+        plus { hours = total // 60, minutes = total - (total // 60) * 60 }
+
+    else
+        let
+            positive =
+                negate total
+        in
+        minus { hours = positive // 60, minutes = positive - (positive // 60) * 60 }
+
+
+
+-- READING
+
+
+{-| Minutes east of UTC. Negative west of it, and `0` for all three spellings
+of zero.
+
+    Offset.fromString "-07:00" |> Maybe.map Offset.toMinutes
+    --> Just -420
+
+-}
+toMinutes : Offset -> Int
+toMinutes offset =
+    when offset is
+        Zulu ->
+            0
+
+        Plus parts ->
+            parts.hours * 60 + parts.minutes
+
+        Minus parts ->
+            negate (parts.hours * 60 + parts.minutes)
+
+
+{-| Whether this was written `Z`, rather than as a zero offset that happens to
+be zero.
+
+    Offset.isZulu Offset.zulu
+    --> True
+
+-}
+isZulu : Offset -> Bool
+isZulu offset =
+    offset == Zulu
+
+
+{-| Whether this was written with a minus sign. True for `-00:00`, which is the
+whole reason the sign is kept.
+
+    Offset.fromString "-00:00" |> Maybe.map Offset.isNegative
+    --> Just True
+
+-}
+isNegative : Offset -> Bool
+isNegative offset =
+    when offset is
+        Minus _ ->
+            True
+
+        _ ->
+            False
+
+
+{-| The hours part, always 0 to 23, without the sign.
+-}
+hours : Offset -> Int
+hours offset =
+    when offset is
+        Zulu ->
+            0
+
+        Plus parts ->
+            parts.hours
+
+        Minus parts ->
+            parts.hours
+
+
+{-| The minutes part, always 0 to 59, without the sign.
+-}
+minutes : Offset -> Int
+minutes offset =
+    when offset is
+        Zulu ->
+            0
+
+        Plus parts ->
+            parts.minutes
+
+        Minus parts ->
+            parts.minutes
+
+
+
+-- STRINGS
+
+
+{-| Read `Z`, `z`, or a signed `HH:MM`.
+
+    Offset.fromString "+12:45" |> Maybe.map Offset.toMinutes
+    --> Just 765
+
+The whole string has to be an offset, the two digit groups have to be two
+digits each, and the colon is required -- `+0900` and `+9:00` are both
+`Nothing`. RFC 3339's grammar is case insensitive, so `z` is accepted for `Z`.
+
+-}
+fromString : String -> Maybe Offset
+fromString str =
+    if str == "Z" || str == "z" then
+        Just Zulu
+
+    else
+        when String.popFirst str is
+            Just { first = sign, rest } ->
+                if sign /= '+' && sign /= '-' then
+                    Nothing
+
+                else
+                    when String.split ":" rest is
+                        [ hourText, minuteText ] ->
+                            if String.count hourText /= 2 || String.count minuteText /= 2 then
+                                Nothing
+
+                            else
+                                Maybe.map2
+                                    (\h m -> { hours = h, minutes = m })
+                                    (twoDigits hourText)
+                                    (twoDigits minuteText)
+                                    |> Maybe.andThen
+                                        (if sign == '+' then
+                                            plus
+
+                                         else
+                                            minus
+                                        )
+
+                        _ ->
+                            Nothing
+
+            Nothing ->
+                Nothing
+
+
+twoDigits : String -> Maybe Int
+twoDigits text =
+    if String.all Char.isDigit text then
+        String.toInt text
+
+    else
+        Nothing
+
+
+{-| Write `Z` or a signed `HH:MM`, both zero padded.
+
+    Offset.fromMinutes 765 |> Maybe.map Offset.toString
+    --> Just "+12:45"
+
+This is the inverse of [`fromString`](#fromString) for every value it can
+produce, including `-00:00`.
+
+-}
+toString : Offset -> String
+toString offset =
+    when offset is
+        Zulu ->
+            "Z"
+
+        Plus parts ->
+            "+" ++ pad parts.hours ++ ":" ++ pad parts.minutes
+
+        Minus parts ->
+            "-" ++ pad parts.hours ++ ":" ++ pad parts.minutes
+
+
+pad : Int -> String
+pad n =
+    String.padLeft 2 '0' (String.fromInt n)

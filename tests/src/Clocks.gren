@@ -1,0 +1,245 @@
+module Clocks exposing (clocksSuite)
+
+{-| Times of day and offsets, on the points the TOML suite does not reach.
+
+`Conformance` covers what TOML writes down. This covers what the two modules
+promise beyond that: the three spellings of a zero offset, which RFC 3339 gives
+three different meanings; the fraction, which is kept exactly and normalised
+for equality; and the round trip through `Posix`, which is the one operation
+here that can silently lose something.
+
+@docs clocksSuite
+
+-}
+
+import Array exposing (Array)
+import Civil.Date as Date
+import Civil.DateTime as DateTime
+import Civil.Offset as Offset
+import Civil.Time as Time
+import Expect
+import Maybe exposing (Maybe(..))
+import Task
+import Test.Runner.UnitNode as U
+import Time as CoreTime
+
+
+{-| -}
+clocksSuite : U.Suite
+clocksSuite =
+    U.suite
+        { name = "Clocks"
+        , setUpSuite = U.noSuiteFixture
+        , tearDownSuite = U.noTearDown
+        , setUp = \_ -> Task.succeed {}
+        , tearDown = U.noTearDown
+        , tests =
+            -- THE THREE ZEROES
+            [ U.test "Z, +00:00 and -00:00 are all zero minutes from UTC" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just 0, Just 0, Just 0 ]
+                        [ Maybe.map Offset.toMinutes (Offset.fromString "Z")
+                        , Maybe.map Offset.toMinutes (Offset.fromString "+00:00")
+                        , Maybe.map Offset.toMinutes (Offset.fromString "-00:00")
+                        ]
+                    )
+            , U.test "but they are three different values, and stay that way" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just "Z", Just "+00:00", Just "-00:00" ]
+                        [ Maybe.map Offset.toString (Offset.fromString "Z")
+                        , Maybe.map Offset.toString (Offset.fromString "+00:00")
+                        , Maybe.map Offset.toString (Offset.fromString "-00:00")
+                        ]
+                    )
+            , U.test "so == tells them apart, where toMinutes does not" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ False, False, True ]
+                        [ Offset.fromString "Z" == Offset.fromString "+00:00"
+                        , Offset.fromString "+00:00" == Offset.fromString "-00:00"
+                        , Offset.fromString "+05:30" == Offset.fromMinutes 330
+                        ]
+                    )
+            , U.test "and only Z answers to isZulu, only the minus to isNegative" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just True, Just False, Just False, Just True ]
+                        [ Maybe.map Offset.isZulu (Offset.fromString "z")
+                        , Maybe.map Offset.isZulu (Offset.fromString "+00:00")
+                        , Maybe.map Offset.isNegative (Offset.fromString "+00:00")
+                        , Maybe.map Offset.isNegative (Offset.fromString "-00:00")
+                        ]
+                    )
+            , U.test "fromMinutes lands on +00:00, since the other two need asking for" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just "+00:00", Just "-07:00", Just "+12:45", Nothing, Nothing ]
+                        (Array.map (\m -> Maybe.map Offset.toString (Offset.fromMinutes m))
+                            [ 0, -420, 765, 1440, -1440 ]
+                        )
+                    )
+            , U.test "offsets need the colon and both digit pairs" <| \_ ->
+                Task.succeed
+                    (Expect.equal (Array.repeat 6 Nothing)
+                        (Array.map (\s -> Maybe.map Offset.toString (Offset.fromString s))
+                            [ "+0900", "+9:00", "+09:0", "+09", "09:00", "+24:00" ]
+                        )
+                    )
+            -- THE FRACTION
+            , U.test "trailing zeroes come off, so == is equality of the time" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        { same = [ True, True ]
+                        , digits = [ Just "55", Just "" ]
+                        }
+                        { same =
+                            [ Time.fromString "10:32:00.5" == Time.fromString "10:32:00.50"
+                            , Time.fromString "10:32:00.000" == Time.fromString "10:32:00"
+                            ]
+                        , digits =
+                            [ Maybe.map Time.fraction (Time.fromString "10:32:00.5500")
+                            , Maybe.map Time.fraction (Time.fromString "10:32:00.000")
+                            ]
+                        }
+                    )
+            , U.test "but the digits that are left are kept, however many" <| \_ ->
+                Task.succeed
+                    (Expect.equal (Just "10:32:00.123456789012345")
+                        (Maybe.map Time.toString (Time.fromString "10:32:00.123456789012345"))
+                    )
+            , U.test "millisecond and nanosecond truncate rather than round" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just 555, Just 555555555, Just 500, Just 500000000, Just 0 ]
+                        [ Maybe.map Time.millisecond (Time.fromString "10:32:00.5559")
+                        , Maybe.map Time.nanosecond (Time.fromString "10:32:00.5555555559")
+                        , Maybe.map Time.millisecond (Time.fromString "10:32:00.5")
+                        , Maybe.map Time.nanosecond (Time.fromString "10:32:00.5")
+                        , Maybe.map Time.millisecond (Time.fromString "10:32:00")
+                        ]
+                    )
+            , U.test "toStringWithPlaces pads and truncates to a fixed width" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just "13:37:00.000", Just "10:32:00.500", Just "10:32:00.5559", Just "10:32:00" ]
+                        [ Maybe.map (Time.toStringWithPlaces 3) (Time.fromString "13:37")
+                        , Maybe.map (Time.toStringWithPlaces 3) (Time.fromString "10:32:00.5")
+                        , Maybe.map (Time.toStringWithPlaces 4) (Time.fromString "10:32:00.55594")
+                        , Maybe.map (Time.toStringWithPlaces 0) (Time.fromString "10:32:00.5")
+                        ]
+                    )
+            , U.test "a fraction needs a seconds field to hang off" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Nothing, Nothing, Nothing ]
+                        (Array.map (\s -> Maybe.map Time.toString (Time.fromString s))
+                            [ "13:37.5", "13:37:00.", "13:37:." ]
+                        )
+                    )
+            -- LEAP SECONDS
+            , U.test "second 60 is a time, second 61 is not" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        { sixty = Just "23:59:60"
+                        , sixtyOne = Nothing
+                        , ofDay = Just 86400
+                        }
+                        { sixty = Maybe.map Time.toString (Time.fromString "23:59:60")
+                        , sixtyOne = Maybe.map Time.toString (Time.fromString "23:59:61")
+                        , ofDay = Maybe.map Time.secondOfDay (Time.fromString "23:59:60")
+                        }
+                    )
+            -- LOCAL IS NOT A MOMENT
+            , U.test "only an offset date-time has a Posix" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Nothing, Just 0 ]
+                        [ DateTime.fromString "1970-01-01T00:00:00"
+                            |> Maybe.andThen DateTime.toPosix
+                            |> Maybe.map CoreTime.posixToMillis
+                        , DateTime.fromString "1970-01-01T00:00:00Z"
+                            |> Maybe.andThen DateTime.toPosix
+                            |> Maybe.map CoreTime.posixToMillis
+                        ]
+                    )
+            , U.test "the offset is applied, not discarded" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just 25200000, Just -25200000, Just 0 ]
+                        [ DateTime.fromString "1970-01-01T00:00:00-07:00"
+                            |> Maybe.andThen DateTime.toPosix
+                            |> Maybe.map CoreTime.posixToMillis
+                        , DateTime.fromString "1970-01-01T00:00:00+07:00"
+                            |> Maybe.andThen DateTime.toPosix
+                            |> Maybe.map CoreTime.posixToMillis
+                        , DateTime.fromString "1970-01-01T00:00:00-00:00"
+                            |> Maybe.andThen DateTime.toPosix
+                            |> Maybe.map CoreTime.posixToMillis
+                        ]
+                    )
+            , U.test "fromPosix and toPosix undo each other, before 1970 too" <| \_ ->
+                Task.succeed
+                    (Expect.equal (Array.map Just millis)
+                        (Array.map
+                            (\ms ->
+                                CoreTime.millisToPosix ms
+                                    |> DateTime.fromPosix
+                                    |> Maybe.andThen DateTime.toPosix
+                                    |> Maybe.map CoreTime.posixToMillis
+                            )
+                            millis
+                        )
+                    )
+            , U.test "and fromPosix writes UTC, with the fraction it has" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        [ Just "1970-01-01T00:00:00Z"
+                        , Just "1969-12-31T23:59:59Z"
+                        , Just "1969-12-31T23:59:59.999Z"
+                        , Just "2024-02-29T12:34:56.078Z"
+                        ]
+                        (Array.map
+                            (\ms ->
+                                CoreTime.millisToPosix ms
+                                    |> DateTime.fromPosix
+                                    |> Maybe.map DateTime.toString
+                            )
+                            [ 0, -1000, -1, 1709210096078 ]
+                        )
+                    )
+            , U.test "the Posix range stops where the calendar does" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Nothing, Nothing ]
+                        (Array.map
+                            (\ms ->
+                                CoreTime.millisToPosix ms
+                                    |> DateTime.fromPosix
+                                    |> Maybe.map DateTime.toString
+                            )
+                            [ -62135596800001, 253402300800000 ]
+                        )
+                    )
+            -- THE SEPARATOR AND THE SPELLINGS
+            , U.test "T, t and a space all separate the date from the time" <| \_ ->
+                Task.succeed
+                    (Expect.equal (Array.repeat 3 (Just "1987-07-05T17:45:00Z"))
+                        (Array.map (\s -> Maybe.map DateTime.toString (DateTime.fromString s))
+                            [ "1987-07-05T17:45:00Z"
+                            , "1987-07-05t17:45:00z"
+                            , "1987-07-05 17:45:00Z"
+                            ]
+                        )
+                    )
+            , U.test "and nothing else does" <| \_ ->
+                Task.succeed
+                    (Expect.equal (Array.repeat 4 Nothing)
+                        (Array.map (\s -> Maybe.map DateTime.toString (DateTime.fromString s))
+                            [ "1987-07-05_17:45:00Z"
+                            , "1987-07-0517:45:00Z"
+                            , "1987-07-05"
+                            , "17:45:00Z"
+                            ]
+                        )
+                    )
+            ]
+        }
+
+
+{-| Moments on both sides of the epoch, at the second and inside it, where a
+truncating division would round the wrong way.
+-}
+millis : Array Int
+millis =
+    [ 0, 1, -1, 999, -999, 1000, -1000, 1709210096078, -2208988800000, 253402300799999 ]

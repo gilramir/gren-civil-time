@@ -1,0 +1,359 @@
+module Civil.DateTime exposing
+    ( DateTime
+    , local, offset
+    , date, time, offsetOf, isLocal
+    , toPosix, fromPosix
+    , fromString, toString
+    )
+
+{-| A date and a time of day, with an offset from UTC or without one.
+
+Two things live in this type, and the difference between them is the whole
+reason the module exists:
+
+  - A **local** date-time, `1979-05-27T07:32:00`, is a reading on a wall clock
+    and a page of a calendar. It is not a moment. Nothing can say when it
+    happened without being told where.
+  - An **offset** date-time, `1979-05-27T07:32:00-07:00`, is a moment. The
+    offset makes it one, and [`toPosix`](#toPosix) can therefore work on it and
+    not on the other.
+
+RFC 3339 and TOML both make the distinction and both keep the offset as it was
+written, rather than normalising everything to UTC. So does this module: an
+offset date-time remembers `-07:00`, and `Z`, `+00:00` and `-00:00` stay apart
+(see [`Civil.Offset`](Civil-Offset)).
+
+
+## What is not here
+
+Conversion between the two. Turning `1979-05-27T07:32:00` into a moment needs a
+time zone, and a time zone needs the IANA database, which is a much larger thing
+than this package and belongs in its own. [`toPosix`](#toPosix) works on offset
+date-times only, and returns `Nothing` for the rest.
+
+@docs DateTime
+
+
+## Creating
+
+@docs local, offset
+
+
+## Reading
+
+@docs date, time, offsetOf, isLocal
+
+
+## Instants
+
+@docs toPosix, fromPosix
+
+
+## Strings
+
+@docs fromString, toString
+
+-}
+
+import Basics exposing (..)
+import Civil.Date as Date exposing (Date)
+import Civil.Offset as Offset exposing (Offset)
+import Civil.Time as Time exposing (Time)
+import Math
+import Maybe exposing (Maybe(..))
+import String
+import Time as CoreTime
+
+
+{-| A date and a time, with or without an offset.
+-}
+type DateTime
+    = Local { date : Date, time : Time }
+    | Offset { date : Date, time : Time, offset : Offset }
+
+
+
+-- CREATING
+
+
+{-| A date-time with no offset: a wall clock reading, not a moment.
+
+    Maybe.map2 DateTime.local
+        (Date.fromString "1979-05-27")
+        (Time.fromString "07:32")
+        |> Maybe.map DateTime.toString
+    --> Just "1979-05-27T07:32:00"
+
+-}
+local : Date -> Time -> DateTime
+local d t =
+    Local { date = d, time = t }
+
+
+{-| A date-time with an offset: a moment.
+
+    Maybe.map3 DateTime.offset
+        (Date.fromString "1979-05-27")
+        (Time.fromString "07:32")
+        (Offset.fromString "-07:00")
+        |> Maybe.map DateTime.toString
+    --> Just "1979-05-27T07:32:00-07:00"
+
+-}
+offset : Date -> Time -> Offset -> DateTime
+offset d t o =
+    Offset { date = d, time = t, offset = o }
+
+
+
+-- READING
+
+
+{-| The date part.
+-}
+date : DateTime -> Date
+date dateTime =
+    when dateTime is
+        Local parts ->
+            parts.date
+
+        Offset parts ->
+            parts.date
+
+
+{-| The time part.
+-}
+time : DateTime -> Time
+time dateTime =
+    when dateTime is
+        Local parts ->
+            parts.time
+
+        Offset parts ->
+            parts.time
+
+
+{-| The offset, if there is one.
+
+    DateTime.fromString "1979-05-27T07:32:00"
+        |> Maybe.map DateTime.offsetOf
+    --> Just Nothing
+
+-}
+offsetOf : DateTime -> Maybe Offset
+offsetOf dateTime =
+    when dateTime is
+        Local _ ->
+            Nothing
+
+        Offset parts ->
+            Just parts.offset
+
+
+{-| Whether this is a wall clock reading rather than a moment.
+-}
+isLocal : DateTime -> Bool
+isLocal dateTime =
+    when dateTime is
+        Local _ ->
+            True
+
+        Offset _ ->
+            False
+
+
+
+-- INSTANTS
+
+
+{-| The moment this date-time names, for one that names a moment.
+
+    DateTime.fromString "1970-01-01T00:00:00Z"
+        |> Maybe.andThen DateTime.toPosix
+        |> Maybe.map Time.posixToMillis
+    --> Just 0
+
+`Nothing` for a local date-time, which does not name one. The fraction is
+truncated to whole milliseconds, which is all a `Posix` holds.
+
+A leap second lands on the following second, since `Posix` has nowhere else to
+put it.
+
+-}
+toPosix : DateTime -> Maybe CoreTime.Posix
+toPosix dateTime =
+    when dateTime is
+        Local _ ->
+            Nothing
+
+        Offset parts ->
+            let
+                days =
+                    Date.toRataDie parts.date - 719163
+
+                seconds =
+                    days * 86400 + Time.secondOfDay parts.time - Offset.toMinutes parts.offset * 60
+            in
+            Just (CoreTime.millisToPosix (seconds * 1000 + Time.millisecond parts.time))
+
+
+{-| The UTC date-time of a moment, written with a `Z` offset.
+
+    Time.millisToPosix 0
+        |> DateTime.fromPosix
+        |> Maybe.map DateTime.toString
+    --> Just "1970-01-01T00:00:00Z"
+
+`Nothing` outside years 1 to 9999. This is UTC and only UTC; rendering a moment
+in some other zone is what the time zone database this package does not have
+would be for.
+
+-}
+fromPosix : CoreTime.Posix -> Maybe DateTime
+fromPosix posix =
+    let
+        millis =
+            CoreTime.posixToMillis posix
+
+        -- floorDiv, so that moments before 1970 land on the right day rather
+        -- than being truncated towards it.
+        totalSeconds =
+            floorDiv millis 1000
+
+        millisPart =
+            millis - totalSeconds * 1000
+
+        days =
+            floorDiv totalSeconds 86400
+
+        secondsPart =
+            totalSeconds - days * 86400
+    in
+    Maybe.map2
+        (\d t -> Offset { date = d, time = t, offset = Offset.zulu })
+        (Date.fromRataDie (days + 719163))
+        (Time.fromParts
+            { hour = secondsPart // 3600
+            , minute = secondsPart // 60 - (secondsPart // 3600) * 60
+            , second = secondsPart - (secondsPart // 60) * 60
+            , fraction =
+                if millisPart == 0 then
+                    ""
+
+                else
+                    String.padLeft 3 '0' (String.fromInt millisPart)
+            }
+        )
+
+
+floorDiv : Int -> Int -> Int
+floorDiv a b =
+    Math.floor (Basics.toFloat a / Basics.toFloat b)
+
+
+
+-- STRINGS
+
+
+{-| Read an RFC 3339 date-time, with or without an offset.
+
+    DateTime.fromString "1979-05-27 07:32Z"
+        |> Maybe.map DateTime.toString
+    --> Just "1979-05-27T07:32:00Z"
+
+The date and the time may be separated by `T`, `t`, or a space, and the offset
+may be `Z` or `z` or signed hours and minutes. Everything else is as strict as
+[`Civil.Date.fromString`](Civil-Date#fromString) and
+[`Civil.Time.fromString`](Civil-Time#fromString): every field the exact number
+of digits, and no trailing anything.
+
+-}
+fromString : String -> Maybe DateTime
+fromString str =
+    -- The separator is the 11th character, after a fixed-width YYYY-MM-DD.
+    -- Splitting on "T" would be wrong: the offset has no T but a malformed
+    -- string might.
+    if String.count str < 11 then
+        Nothing
+
+    else
+        let
+            dateText =
+                String.takeFirst 10 str
+
+            separator =
+                String.slice 10 11 str
+
+            rest =
+                String.dropFirst 11 str
+        in
+        if separator /= "T" && separator /= "t" && separator /= " " then
+            Nothing
+
+        else
+            when Date.fromString dateText is
+                Nothing ->
+                    Nothing
+
+                Just d ->
+                    when splitOffset rest is
+                        Nothing ->
+                            Maybe.map (\t -> Local { date = d, time = t })
+                                (Time.fromString rest)
+
+                        Just parts ->
+                            Maybe.map2
+                                (\t o -> Offset { date = d, time = t, offset = o })
+                                (Time.fromString parts.time)
+                                (Offset.fromString parts.offset)
+
+
+{-| Split a `full-time` into its `partial-time` and its `time-offset`, or say
+there is no offset. The offset starts at the last `Z`, `z`, `+` or `-`, none of
+which can appear inside a `partial-time`.
+-}
+splitOffset : String -> Maybe { time : String, offset : String }
+splitOffset str =
+    let
+        at index =
+            let
+                unit =
+                    String.slice index (index + 1) str
+            in
+            unit == "Z" || unit == "z" || unit == "+" || unit == "-"
+
+        search index =
+            if index < 0 then
+                Nothing
+
+            else if at index then
+                Just
+                    { time = String.takeFirst index str
+                    , offset = String.dropFirst index str
+                    }
+
+            else
+                search (index - 1)
+    in
+    search (String.count str - 1)
+
+
+{-| Write an RFC 3339 date-time: `T` between the date and the time, seconds
+always present, and the offset as it was given.
+
+    DateTime.fromString "1987-07-05t17:45:00z"
+        |> Maybe.map DateTime.toString
+    --> Just "1987-07-05T17:45:00Z"
+
+-}
+toString : DateTime -> String
+toString dateTime =
+    when dateTime is
+        Local parts ->
+            Date.toString parts.date ++ "T" ++ Time.toString parts.time
+
+        Offset parts ->
+            Date.toString parts.date
+                ++ "T"
+                ++ Time.toString parts.time
+                ++ Offset.toString parts.offset

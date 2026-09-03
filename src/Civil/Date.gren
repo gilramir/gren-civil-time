@@ -1,0 +1,501 @@
+module Civil.Date exposing
+    ( Date
+    , fromParts, fromRataDie
+    , year, month, day, monthOf, weekday, ordinalDay, toRataDie
+    , isLeapYear, daysInMonth
+    , addDays, difference
+    , fromString, toString
+    )
+
+{-| A date on the calendar, with no time of day and no time zone.
+
+`2024-02-29` is a date. It is not an instant: it did not happen at the same
+moment in Auckland as in Denver, and asking when it "was" has no answer until
+someone supplies a zone. What it is instead is a position on the Gregorian
+calendar, which is a thing worth having on its own -- a birthday, an invoice
+date, the day a file is filed under.
+
+Every `Date` that exists is a real date. [`fromParts`](#fromParts) and
+[`fromString`](#fromString) are the only ways to make one and both check the
+calendar, so `2023-02-29` never becomes a value and nothing downstream has to
+ask whether it might have.
+
+
+## Range
+
+Year 1 through year 9999, which is RFC 3339's range and therefore TOML's. Year
+zero and negative years are not dates in this module; the Gregorian calendar
+did not exist then, and proleptic arithmetic before 1582 is a convention rather
+than a fact.
+
+@docs Date
+
+
+## Creating
+
+@docs fromParts, fromRataDie
+
+
+## Reading
+
+@docs year, month, day, monthOf, weekday, ordinalDay, toRataDie
+
+
+## The calendar
+
+@docs isLeapYear, daysInMonth
+
+
+## Arithmetic
+
+@docs addDays, difference
+
+
+## Strings
+
+@docs fromString, toString
+
+-}
+
+import Basics exposing (..)
+import Char
+import Math
+import Maybe exposing (Maybe(..))
+import String
+import Time
+
+
+{-| A date on the Gregorian calendar.
+
+Two `Date`s are `==` when they are the same day, because there is only one way
+to store one.
+
+-}
+type Date
+    = Date { year : Int, month : Int, day : Int }
+
+
+
+-- CREATING
+
+
+{-| A date from a year, a month numbered 1 to 12, and a day numbered from 1.
+
+    Date.fromParts { year = 2024, month = 2, day = 29 }
+        |> Maybe.map Date.toString
+    --> Just "2024-02-29"
+
+`Nothing` if the year is outside 1 to 9999, the month outside 1 to 12, or the
+day outside the length of that month in that year:
+
+    Date.fromParts { year = 2100, month = 2, day = 29 }
+    --> Nothing
+
+-}
+fromParts : { year : Int, month : Int, day : Int } -> Maybe Date
+fromParts parts =
+    if parts.year < 1 || parts.year > 9999 then
+        Nothing
+
+    else if parts.month < 1 || parts.month > 12 then
+        Nothing
+
+    else if parts.day < 1 || parts.day > daysInMonth { year = parts.year, month = parts.month } then
+        Nothing
+
+    else
+        Just (Date parts)
+
+
+{-| A date from its Rata Die day number: 1 is 0001-01-01, and every day after
+that is one more.
+
+    Date.fromRataDie 738945 |> Maybe.map Date.toString
+    --> Just "2024-02-29"
+
+`Nothing` outside the representable range, which is 1 through 3652059.
+
+-}
+fromRataDie : Int -> Maybe Date
+fromRataDie rd =
+    if rd < 1 || rd > 3652059 then
+        Nothing
+
+    else
+        let
+            -- Howard Hinnant's civil_from_days, shifted from the 1970 epoch
+            -- to Rata Die. Every intermediate here stays under 2^24, which
+            -- matters because Gren's // truncates its result to 32 bits.
+            z =
+                rd + 305
+
+            era =
+                z // 146097
+
+            doe =
+                z - era * 146097
+
+            yoe =
+                (doe - doe // 1460 + doe // 36524 - doe // 146096) // 365
+
+            y =
+                yoe + era * 400
+
+            doy =
+                doe - (365 * yoe + yoe // 4 - yoe // 100)
+
+            mp =
+                (5 * doy + 2) // 153
+
+            d =
+                doy - (153 * mp + 2) // 5 + 1
+
+            m =
+                if mp < 10 then
+                    mp + 3
+
+                else
+                    mp - 9
+        in
+        Just
+            (Date
+                { year =
+                    if m <= 2 then
+                        y + 1
+
+                    else
+                        y
+                , month = m
+                , day = d
+                }
+            )
+
+
+
+-- READING
+
+
+{-| The year, 1 to 9999.
+-}
+year : Date -> Int
+year (Date parts) =
+    parts.year
+
+
+{-| The month, 1 to 12.
+-}
+month : Date -> Int
+month (Date parts) =
+    parts.month
+
+
+{-| The day of the month, counting from 1.
+-}
+day : Date -> Int
+day (Date parts) =
+    parts.day
+
+
+{-| The month as core's `Time.Month`, for handing to anything that speaks it.
+
+    Date.fromString "2024-02-29" |> Maybe.map Date.monthOf
+    --> Just Time.Feb
+
+-}
+monthOf : Date -> Time.Month
+monthOf (Date parts) =
+    when parts.month is
+        1 ->
+            Time.Jan
+
+        2 ->
+            Time.Feb
+
+        3 ->
+            Time.Mar
+
+        4 ->
+            Time.Apr
+
+        5 ->
+            Time.May
+
+        6 ->
+            Time.Jun
+
+        7 ->
+            Time.Jul
+
+        8 ->
+            Time.Aug
+
+        9 ->
+            Time.Sep
+
+        10 ->
+            Time.Oct
+
+        11 ->
+            Time.Nov
+
+        _ ->
+            Time.Dec
+
+
+{-| Which day of the week this date fell on.
+
+    Date.fromString "2024-02-29" |> Maybe.map Date.weekday
+    --> Just Time.Thu
+
+-}
+weekday : Date -> Time.Weekday
+weekday date =
+    when Math.modBy 7 (toRataDie date) is
+        0 ->
+            Time.Sun
+
+        1 ->
+            Time.Mon
+
+        2 ->
+            Time.Tue
+
+        3 ->
+            Time.Wed
+
+        4 ->
+            Time.Thu
+
+        5 ->
+            Time.Fri
+
+        _ ->
+            Time.Sat
+
+
+{-| The day of the year, 1 to 366.
+
+    Date.fromString "2024-03-01" |> Maybe.map Date.ordinalDay
+    --> Just 61
+
+-}
+ordinalDay : Date -> Int
+ordinalDay ((Date parts) as date) =
+    toRataDie date - toRataDie (Date { year = parts.year, month = 1, day = 1 }) + 1
+
+
+{-| The Rata Die day number: 0001-01-01 is 1, and each following day is one
+more. This is the form to do arithmetic in and to compare in, and it is what
+[`fromRataDie`](#fromRataDie) reads back.
+
+    Date.fromString "0001-01-01" |> Maybe.map Date.toRataDie
+    --> Just 1
+
+-}
+toRataDie : Date -> Int
+toRataDie (Date parts) =
+    let
+        -- Hinnant's days_from_civil, offset to put 0001-01-01 at 1. March is
+        -- treated as the first month so that the leap day lands at the end of
+        -- the year and the month-length pattern becomes a single formula.
+        y =
+            if parts.month <= 2 then
+                parts.year - 1
+
+            else
+                parts.year
+
+        era =
+            y // 400
+
+        yoe =
+            y - era * 400
+
+        mp =
+            if parts.month > 2 then
+                parts.month - 3
+
+            else
+                parts.month + 9
+
+        doy =
+            (153 * mp + 2) // 5 + parts.day - 1
+
+        doe =
+            yoe * 365 + yoe // 4 - yoe // 100 + doy
+    in
+    era * 146097 + doe - 305
+
+
+
+-- THE CALENDAR
+
+
+{-| Whether a year has a 29th of February.
+
+    Date.isLeapYear 2000
+    --> True
+
+    Date.isLeapYear 2100
+    --> False
+
+Divisible by four, except centuries, except every fourth century. 2000 was the
+exception to the exception, which is why so much software written before it
+believed 2100 would be a leap year too.
+
+-}
+isLeapYear : Int -> Bool
+isLeapYear y =
+    Math.modBy 4 y == 0 && (Math.modBy 100 y /= 0 || Math.modBy 400 y == 0)
+
+
+{-| How many days a month has in a given year.
+
+    Date.daysInMonth { year = 2023, month = 2 }
+    --> 28
+
+Zero for a month outside 1 to 12, so that a range check on it also rejects the
+month.
+
+-}
+daysInMonth : { year : Int, month : Int } -> Int
+daysInMonth parts =
+    when parts.month is
+        1 ->
+            31
+
+        2 ->
+            if isLeapYear parts.year then
+                29
+
+            else
+                28
+
+        3 ->
+            31
+
+        4 ->
+            30
+
+        5 ->
+            31
+
+        6 ->
+            30
+
+        7 ->
+            31
+
+        8 ->
+            31
+
+        9 ->
+            30
+
+        10 ->
+            31
+
+        11 ->
+            30
+
+        12 ->
+            31
+
+        _ ->
+            0
+
+
+
+-- ARITHMETIC
+
+
+{-| Move a date forward, or backward with a negative number.
+
+    Date.fromString "2024-02-28"
+        |> Maybe.andThen (Date.addDays 1)
+        |> Maybe.map Date.toString
+    --> Just "2024-02-29"
+
+`Nothing` if the result would leave years 1 to 9999.
+
+-}
+addDays : Int -> Date -> Maybe Date
+addDays days date =
+    fromRataDie (toRataDie date + days)
+
+
+{-| How many days from the first date to the second. Negative if the second is
+earlier.
+
+    Maybe.map2 Date.difference
+        (Date.fromString "2024-02-28")
+        (Date.fromString "2024-03-01")
+    --> Just 2
+
+-}
+difference : Date -> Date -> Int
+difference from to =
+    toRataDie to - toRataDie from
+
+
+
+-- STRINGS
+
+
+{-| Read a `YYYY-MM-DD` date.
+
+    Date.fromString "1979-05-27" |> Maybe.map Date.ordinalDay
+    --> Just 147
+
+The whole string has to be the date, every field has to have exactly the digits
+shown, and the date has to exist. All of these are `Nothing`:
+
+    Date.fromString "1979-5-27"     --> Nothing
+    Date.fromString "01979-05-27"   --> Nothing
+    Date.fromString "1979-05-27T00" --> Nothing
+    Date.fromString "1979-02-30"    --> Nothing
+
+-}
+fromString : String -> Maybe Date
+fromString str =
+    when String.split "-" str is
+        [ yearText, monthText, dayText ] ->
+            if String.count yearText /= 4 || String.count monthText /= 2 || String.count dayText /= 2 then
+                Nothing
+
+            else
+                Maybe.map3
+                    (\y m d -> { year = y, month = m, day = d })
+                    (digits yearText)
+                    (digits monthText)
+                    (digits dayText)
+                    |> Maybe.andThen fromParts
+
+        _ ->
+            Nothing
+
+
+digits : String -> Maybe Int
+digits text =
+    if String.all Char.isDigit text then
+        String.toInt text
+
+    else
+        Nothing
+
+
+{-| Write a `YYYY-MM-DD` date, zero padded.
+
+    Date.fromParts { year = 7, month = 1, day = 2 }
+        |> Maybe.map Date.toString
+    --> Just "0007-01-02"
+
+-}
+toString : Date -> String
+toString (Date parts) =
+    pad 4 parts.year ++ "-" ++ pad 2 parts.month ++ "-" ++ pad 2 parts.day
+
+
+pad : Int -> Int -> String
+pad width n =
+    String.padLeft width '0' (String.fromInt n)
