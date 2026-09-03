@@ -143,6 +143,26 @@ clocksSuite =
                         , ofDay = Maybe.map Time.secondOfDay (Time.fromString "23:59:60")
                         }
                     )
+            , U.test "second 60 is a field on its own, not a rule about 23:59" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        { text = [ Just "00:00:60", Just "12:30:60" ]
+                        , parts = Just "12:30:60"
+                        , ofDay = Just 45060
+                        , dateTime = Just "1990-12-31T15:59:60-08:00"
+                        }
+                        { text =
+                            Array.map (\s -> Maybe.map Time.toString (Time.fromString s))
+                                [ "00:00:60", "12:30:60" ]
+                        , parts =
+                            Maybe.map Time.toString
+                                (Time.fromParts { hour = 12, minute = 30, second = 60, fraction = "" })
+                        , ofDay = Maybe.map Time.secondOfDay (Time.fromString "12:30:60")
+                        , dateTime =
+                            Maybe.map DateTime.toString
+                                (DateTime.fromString "1990-12-31T15:59:60-08:00")
+                        }
+                    )
             -- LOCAL IS NOT A MOMENT
             , U.test "only an offset date-time has a Posix" <| \_ ->
                 Task.succeed

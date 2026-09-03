@@ -24,7 +24,7 @@ Everything runs inside devbox; `gren` and node 22 are not on `PATH` otherwise.
 ```sh
 devbox run build    # compile the package
 devbox run docs     # check the doc comments parse
-devbox run test     # tests/run.sh: 99 checks, milliseconds
+devbox run test     # tests/run.sh: 100 checks, milliseconds
 devbox run probe    # tests/probe.sh: the exhaustive checks, about ten seconds
 devbox run gen      # regenerate the six generated test modules, and format them
 ```

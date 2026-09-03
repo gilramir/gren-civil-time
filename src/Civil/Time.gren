@@ -46,6 +46,14 @@ module does no arithmetic that would need to decide what a leap second means:
 [`secondOfDay`](#secondOfDay) returns `86400` for `23:59:60`, one past the
 last ordinary second of the day.
 
+The `60` is checked as a field on its own, not as part of an `HH:MM:SS` that
+has to read `23:59:60`. `12:30:60` is a time here, and `secondOfDay` gives it
+`45060`. That is RFC 3339's grammar, which allows `60` in the seconds field
+and leaves the question of whether a leap second was really inserted at that
+instant to whoever knows. It has to: a leap second falls at `23:59:60` UTC,
+which is some other wall clock at every other offset, so the same second is
+`1990-12-31T15:59:60-08:00` in California.
+
 @docs Time
 
 
@@ -97,6 +105,22 @@ outside 0 to 60, or the fraction is anything but digits.
 
 Trailing zeroes are dropped from the fraction, so a fraction of `"5550"` gives
 the same value as `"555"`.
+
+The fraction is a `String` and not an `Int` because its digits are positional
+and a number loses that. `"5"` is half a second and `"05"` is a twentieth of
+one, but both are the number 5; only the text says where after the point the
+digits start.
+
+    Time.fromParts { hour = 10, minute = 32, second = 0, fraction = "05" }
+        |> Maybe.map Time.toString
+    --> Just "10:32:00.05"
+
+A number would also have to fix a unit and a precision, milliseconds or
+nanoseconds or some other, and the number of digits here is not limited, so
+everything past that unit would be rounded away. Text keeps every digit that
+was written.
+[`millisecond`](#millisecond) and [`nanosecond`](#nanosecond) are there for
+when a number is what you want.
 
 -}
 fromParts : { hour : Int, minute : Int, second : Int, fraction : String } -> Maybe Time

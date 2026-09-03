@@ -7,9 +7,11 @@ time, the same everywhere in the world, and that is the right type for
 recording when something happened. It is the wrong type for a birthday, a
 shop's opening hour, the date on an invoice, or the `1979-05-27T07:32:00` in a
 config file. Those are readings from a calendar and a clock. They only become
-moments once you know where they were read, and often nobody says.
+moments once you know where they were read  (their offset from UTC/Zulu time).
 
-This package provides the types for those readings.
+This package provides the types for those readings. This package was originally
+written to support reading TOML files, so that's why there are many references
+to TOML in the docs and in the tests.
 
 ```gren
 import Civil.DateTime as DateTime
@@ -78,6 +80,14 @@ records one is valid. The package does no arithmetic that would need to decide
 what a leap second means. `secondOfDay` simply returns `86400` for it, one past
 the last ordinary second of the day.
 
+The `60` is checked as a seconds field on its own, not as part of an
+`HH:MM:SS` that has to read `23:59:60`. `12:30:60` parses too, and
+`secondOfDay` gives it `45060`. That is RFC 3339's grammar, which allows `60`
+in the seconds field and leaves the question of whether a leap second was
+really inserted at that instant to whoever knows. It has to: a leap second
+falls at `23:59:60` UTC, which is some other wall clock at every other offset,
+so the same second is `1990-12-31T15:59:60-08:00` in California.
+
 ## Tests
 
 ```sh
@@ -85,21 +95,21 @@ git clone <this repo>     # --recurse-submodules is optional; see below
 devbox run test
 ```
 
-The suite is 99 checks and runs in a few milliseconds. It needs **no
+The suite is 100 checks and runs in a few milliseconds. It needs **no
 submodule and no network**, because every test file is committed:
 
 ```
 Dates              ok    17/17  (4 ms)
-Clocks             ok    32/32  (3 ms)
-Conformance        ok     3/3   (1 ms)
-Examples.Date      ok    18/18  (1 ms)
+Clocks             ok    33/33  (3 ms)
+Conformance        ok     3/3   (2 ms)
+Examples.Date      ok    18/18  (0 ms)
 Examples.Time      ok    13/13  (0 ms)
-Examples.Offset    ok     9/9   (1 ms)
+Examples.Offset    ok     9/9   (0 ms)
 Examples.DateTime  ok     7/7   (0 ms)
 
-Ran 99 tests in 10 ms
+Ran 100 tests in 9 ms
 
-OK — 99 passed
+OK — 100 passed
 ```
 
 What each suite checks:
@@ -167,7 +177,3 @@ after regenerating means a script and its output have drifted apart. Two
 safeguards keep a broken generator from producing an empty suite that passes:
 `gen-conformance.py` writes the number of cases it found into a guard test,
 and `gen-examples.py` refuses to write a module in which it found no examples.
-
-## License
-
-ISC.
