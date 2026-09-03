@@ -7,7 +7,7 @@ time, the same everywhere in the world, and that is the right type for
 recording when something happened. It is the wrong type for a birthday, a
 shop's opening hour, the date on an invoice, or the `1979-05-27T07:32:00` in a
 config file. Those are readings from a calendar and a clock. They only become
-moments once you know where they were read  (their offset from UTC/Zulu time).
+moments once you know where they were read.
 
 This package provides the types for those readings. This package was originally
 written to support reading TOML files, so that's why there are many references
@@ -95,21 +95,20 @@ git clone <this repo>     # --recurse-submodules is optional; see below
 devbox run test
 ```
 
-The suite is 100 checks and runs in a few milliseconds. It needs **no
-submodule and no network**, because every test file is committed:
+The suite is 101 checks and runs in a few milliseconds.
 
 ```
-Dates              ok    17/17  (4 ms)
+Dates              ok    17/17  (3 ms)
 Clocks             ok    33/33  (3 ms)
-Conformance        ok     3/3   (2 ms)
+Conformance        ok     3/3   (1 ms)
 Examples.Date      ok    18/18  (0 ms)
-Examples.Time      ok    13/13  (0 ms)
+Examples.Time      ok    14/14  (0 ms)
 Examples.Offset    ok     9/9   (0 ms)
-Examples.DateTime  ok     7/7   (0 ms)
+Examples.DateTime  ok     7/7   (1 ms)
 
-Ran 100 tests in 9 ms
+Ran 101 tests in 8 ms
 
-OK — 100 passed
+OK — 101 passed
 ```
 
 What each suite checks:
@@ -119,7 +118,7 @@ What each suite checks:
 | `Dates` | Forty dates against Python's `datetime.date`, whose `toordinal` uses the same day numbering as `toRataDie`. Ten are dates where calendar code tends to break and thirty are random across the whole range. Also the constructor and the accessors called directly. |
 | `Clocks` | What the TOML suite does not reach: the three zero offsets, the fraction, leap seconds, the `Posix` round trip on both sides of 1970, `toPosix` against Python-computed values for real offsets, and which characters count as digits. |
 | `Conformance` | Every date and time in the official [toml-test](https://github.com/toml-lang/toml-test) suite: 32 that must parse and 70 that must not. |
-| `Examples.*` | Every `-->` example in the doc comments, 47 of them, checked against the value it claims. |
+| `Examples.*` | Every `-->` example in the doc comments, 48 of them, checked against the value it claims. |
 
 ### The slow checks
 
@@ -138,7 +137,7 @@ seconds, so it has its own runner and is not part of `devbox run test`.
 
 `tests/src/Dates.gren`, `tests/src/Conformance.gren` and the four modules
 under `tests/src/Examples/` are **generated**, and the generated files are
-committed. That is why the tests above need nothing extra.
+committed.
 
 The conformance generator reads the TOML test corpus from `vendor/toml-test`,
 a git submodule pinned to one commit. It is pinned because the generator
