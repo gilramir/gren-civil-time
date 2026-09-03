@@ -13,14 +13,14 @@ module Civil.Offset exposing
     , zulu
     )
 
-{-| A fixed offset from UTC, as a date-time was written down.
+{-| A fixed offset from UTC, as written in a date-time.
 
-This is not a time zone. `America/Denver` is a time zone: a set of rules that
-says the offset is -07:00 in January and -06:00 in June, and that has changed
-several times since 1883. `-07:00` is an offset: a number of minutes, with no
-rule and no history behind it. A timestamp carries the second, never the first
--- which is why you cannot recover the zone from a timestamp, and why this
-module stops here.
+An offset is not a time zone. `America/Denver` is a time zone: a set of rules
+saying that the offset is -07:00 in January and -06:00 in June, and those
+rules have changed several times since 1883. `-07:00` is an offset: a plain
+number of minutes, with no rules and no history behind it. A timestamp records
+the offset, never the zone. That is why the zone cannot be recovered from a
+timestamp, and why this module deals only in offsets.
 
 
 ## Three ways to write zero
@@ -28,20 +28,19 @@ module stops here.
 RFC 3339 gives `Z`, `+00:00` and `-00:00` three separate meanings, and this
 module keeps them apart:
 
-  - `Z` is UTC, asserted.
-  - `+00:00` is an offset that happens to be zero.
-  - `-00:00` is the offset the RFC reserves for "the local offset is unknown"
-    (section 4.3).
+  - `Z` means the time is in UTC.
+  - `+00:00` is an ordinary offset that happens to be zero.
+  - `-00:00` means the local offset is unknown (RFC 3339, section 4.3).
 
 All three are zero minutes from UTC, so [`toMinutes`](#toMinutes) returns `0`
-for all three, but `==` tells them apart. If you want to compare the numbers
-rather than the spellings, compare `toMinutes`.
+for each of them, but `==` treats them as three different values. To compare
+offsets by their number rather than their spelling, compare `toMinutes`.
 
 
 ## Range
 
-`-23:59` through `+23:59`, which is what TOML's grammar allows. The constructors
-return `Nothing` outside it.
+`-23:59` through `+23:59`, which is what TOML's grammar allows. The
+constructors return `Nothing` for anything outside that range.
 
 @docs Offset
 
@@ -115,7 +114,7 @@ plus parts =
     --> Just "-07:00"
 
 Note that `minus { hours = 0, minutes = 0 }` is `-00:00`, which RFC 3339 reads
-as "offset unknown" rather than as UTC. If you meant UTC, use [`zulu`](#zulu).
+as "offset unknown" rather than as UTC. If you mean UTC, use [`zulu`](#zulu).
 
 -}
 minus : { hours : Int, minutes : Int } -> Maybe Offset
@@ -137,8 +136,8 @@ inRange parts =
     Offset.fromMinutes -420 |> Maybe.map Offset.toString
     --> Just "-07:00"
 
-Zero gives `+00:00`, not `Z` and not `-00:00`; those two have to be asked for
-by name. `Nothing` outside -1439 to 1439.
+Zero gives `+00:00`. For `Z` use [`zulu`](#zulu), and for `-00:00` use
+[`minus`](#minus). `Nothing` outside -1439 to 1439.
 
 -}
 fromMinutes : Int -> Maybe Offset
@@ -157,8 +156,8 @@ fromMinutes total =
 -- READING
 
 
-{-| Minutes east of UTC. Negative west of it, and `0` for all three spellings
-of zero.
+{-| Minutes east of UTC, negative for an offset west of it. `0` for all three
+spellings of zero.
 
     Offset.fromString "-07:00" |> Maybe.map Offset.toMinutes
     --> Just -420
@@ -189,8 +188,8 @@ isZulu offset =
     offset == Zulu
 
 
-{-| Whether this was written with a minus sign. True for `-00:00`, which is the
-whole reason the sign is kept.
+{-| Whether this was written with a minus sign. True for `-00:00`; the sign is
+what tells it apart from `+00:00`.
 
     Offset.fromString "-00:00" |> Maybe.map Offset.isNegative
     --> Just True
@@ -244,9 +243,10 @@ minutes offset =
     Offset.fromString "+12:45" |> Maybe.map Offset.toMinutes
     --> Just 765
 
-The whole string has to be an offset, the two digit groups have to be two
-digits each, and the colon is required -- `+0900` and `+9:00` are both
-`Nothing`. RFC 3339's grammar is case insensitive, so `z` is accepted for `Z`.
+The whole string has to be the offset, the hours and the minutes have to be
+two digits each, and the colon is required, so `+0900` and `+9:00` are both
+`Nothing`. RFC 3339's grammar is case insensitive, so `z` is accepted as well
+as `Z`.
 
 -}
 fromString : String -> Maybe Offset
@@ -295,13 +295,13 @@ twoDigits text =
         Nothing
 
 
-{-| Write `Z` or a signed `HH:MM`, both zero padded.
+{-| Write `Z`, or a signed `HH:MM` with zero padding.
 
     Offset.fromMinutes 765 |> Maybe.map Offset.toString
     --> Just "+12:45"
 
-This is the inverse of [`fromString`](#fromString) for every value it can
-produce, including `-00:00`.
+Reading the result back with [`fromString`](#fromString) gives the same
+value, including for `-00:00`.
 
 -}
 toString : Offset -> String

@@ -1,15 +1,15 @@
 # gren-civil-time
 
-Dates and times of day with no instant attached.
+Calendar dates and clock times, with or without an offset from UTC.
 
-Gren's `Time` module is about *absolute* time: a `Posix` is a moment, the same
-moment everywhere, and that is the right type for when something happened. It
-is the wrong type for a birthday, an opening hour, a date on an invoice, or the
-`1979-05-27T07:32:00` in a config file. Those are readings on a calendar and a
-clock. They become moments only when someone supplies a place, and often nobody
-ever does.
+Gren's core `Time` module deals in *moments*. A `Posix` is one exact point in
+time, the same everywhere in the world, and that is the right type for
+recording when something happened. It is the wrong type for a birthday, a
+shop's opening hour, the date on an invoice, or the `1979-05-27T07:32:00` in a
+config file. Those are readings from a calendar and a clock. They only become
+moments once you know where they were read, and often nobody says.
 
-This package is the other type.
+This package provides the types for those readings.
 
 ```gren
 import Civil.DateTime as DateTime
@@ -21,61 +21,72 @@ DateTime.fromString "1979-05-27 07:32:00-07:00"
 
 ## The four shapes
 
-RFC 3339 and TOML both distinguish four, and so does this package:
+[RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) is the standard for writing
+dates and times as text, and TOML uses it for its date and time values. Both
+distinguish four shapes. So does this package:
 
 | example | what it is | module |
 |---|---|---|
 | `1979-05-27` | a date | `Civil.Date` |
 | `07:32:00` | a time of day | `Civil.Time` |
-| `1979-05-27T07:32:00` | both, still not a moment | `Civil.DateTime` |
+| `1979-05-27T07:32:00` | a date and a time, but still not a moment | `Civil.DateTime` |
 | `1979-05-27T07:32:00-07:00` | a moment | `Civil.DateTime` |
 
-The fourth is the only one with a `Posix`, and `toPosix` returns `Nothing` for
-the third. Turning a local date-time into a moment needs a time zone rather than
-an offset, and a time zone needs the IANA database — which is a much larger
-thing than this package and is deliberately not in it.
+The last shape carries an *offset*: how far the clock was ahead of or behind
+UTC when the reading was taken. That is enough to pin down a moment, so
+`DateTime.toPosix` works on it. The third shape has no offset, so `toPosix`
+returns `Nothing` for it.
 
-## What it will not let you build
+Turning the third shape into a moment needs a time zone, such as
+`America/Denver`. A time zone is a set of rules for which offset applies when,
+and those rules change over the years. They live in the IANA time zone
+database, which is far larger than this package and is deliberately left out
+of it.
 
-Every value that exists is a real one. `2023-02-29`, `24:00:00`, `+25:00` and
-`1979-5-27` are all `Nothing`, so nothing downstream has to wonder.
+## Every value is valid
+
+The only way to build a value is through a constructor, and every constructor
+checks its input. `2023-02-29`, `24:00:00`, `+25:00` and `1979-5-27` all give
+`Nothing`, so code that receives a value never has to check it again.
 
 ```gren
-Civil.Date.fromString "2100-02-29"   --> Nothing   -- not a leap year
+Civil.Date.fromString "2100-02-29"   --> Nothing   -- 2100 is not a leap year
 Civil.Date.fromString "2024-02-29"   --> a date
 ```
 
-The range is year 1 through year 9999, which is RFC 3339's.
+Years run from 1 to 9999, the range RFC 3339 allows.
 
-## Three ways to write zero
+## Three ways to write a zero offset
 
-`Z`, `+00:00` and `-00:00` are all zero minutes from UTC, and RFC 3339 gives
-them three different meanings — the last is its "offset unknown". `Civil.Offset`
-keeps them apart under `==` and collapses them under `toMinutes`, so you can ask
-either question.
+`Z`, `+00:00` and `-00:00` all mean zero minutes from UTC, but RFC 3339 gives
+them three different meanings. `Z` says the time is in UTC. `+00:00` is an
+ordinary offset that happens to be zero. `-00:00` means the offset is unknown.
+`Civil.Offset` keeps the three apart: they are different values under `==`,
+but `toMinutes` returns `0` for all of them. Use whichever comparison you need.
 
-## Fractions are kept
+## Fractions of a second are kept in full
 
-There is no millisecond limit and no nanosecond limit. The digits after the
-decimal point are stored as they were given, however many, because deciding
-that the twelfth one does not matter is not this package's decision. Trailing
-zeroes do come off, so that `10:32:00.5` and `10:32:00.50` are one value.
+There is no millisecond or nanosecond limit. The digits after the decimal
+point are stored as text, however many there are, so nothing is rounded away.
+Trailing zeroes are dropped, so `10:32:00.5` and `10:32:00.50` are the same
+value.
 
 ## Leap seconds
 
-`23:59:60` parses, because RFC 3339 allows it and a timestamp that records one
-is not malformed. No arithmetic here pretends to know what it means:
-`secondOfDay` returns `86400`, which is honest rather than useful.
+`23:59:60` parses, because RFC 3339 allows a leap second and a timestamp that
+records one is valid. The package does no arithmetic that would need to decide
+what a leap second means. `secondOfDay` simply returns `86400` for it, one past
+the last ordinary second of the day.
 
 ## Tests
 
 ```sh
-git clone <this repo>     # --recurse-submodules is optional here; see below
+git clone <this repo>     # --recurse-submodules is optional; see below
 devbox run test
 ```
 
-99 checks, in a few milliseconds, with **no submodule and no network needed**.
-The fixtures are committed, so a plain `git clone` is enough to run everything:
+The suite is 99 checks and runs in a few milliseconds. It needs **no
+submodule and no network**, because every test file is committed:
 
 ```
 Dates              ok    17/17  (4 ms)
@@ -91,14 +102,14 @@ Ran 99 tests in 10 ms
 OK — 99 passed
 ```
 
-What they check:
+What each suite checks:
 
-| suite | against |
+| suite | what it checks |
 |---|---|
-| `Dates` | Python's `datetime.date`, whose `toordinal` is Rata Die on the same epoch — forty dates, ten where things break and thirty at random across the whole range; plus the constructor and the accessors called directly |
-| `Clocks` | the promises past what TOML exercises: the three zero offsets, the fraction, leap seconds, the `Posix` round trip on both sides of the epoch, `toPosix` against Python on real offsets, and what a digit is |
-| `Conformance` | every date and time in the official [toml-test](https://github.com/toml-lang/toml-test) suite — 32 that must parse and 70 that must not |
-| `Examples.*` | every `-->` example in the doc comments, 47 of them, checked against the value it claims |
+| `Dates` | Forty dates against Python's `datetime.date`, whose `toordinal` uses the same day numbering as `toRataDie`. Ten are dates where calendar code tends to break and thirty are random across the whole range. Also the constructor and the accessors called directly. |
+| `Clocks` | What the TOML suite does not reach: the three zero offsets, the fraction, leap seconds, the `Posix` round trip on both sides of 1970, `toPosix` against Python-computed values for real offsets, and which characters count as digits. |
+| `Conformance` | Every date and time in the official [toml-test](https://github.com/toml-lang/toml-test) suite: 32 that must parse and 70 that must not. |
+| `Examples.*` | Every `-->` example in the doc comments, 47 of them, checked against the value it claims. |
 
 ### The slow checks
 
@@ -106,55 +117,56 @@ What they check:
 devbox run probe
 ```
 
-`tests/src/Probe.gren` walks all 3,652,059 days of the calendar in order,
-knowing only how long each month is, and asks at every one that the day
-number, the day of the year, the weekday, the text and the `Posix` all agree
-with the walk. Then every second of a day through `Posix` and back, and every
-offset through text and back. About ten seconds, which is why it has its own
-runner and is not in `devbox run test`.
+`tests/src/Probe.gren` walks every one of the 3,652,059 days from year 1 to
+year 9999, using only the length of each month, and checks at each day that
+the day number, the day of the year, the weekday, the text form and the
+`Posix` all agree with the walk. It then sends every second of a day through
+`Posix` and back, and every offset through text and back. It takes about ten
+seconds, so it has its own runner and is not part of `devbox run test`.
 
-### The submodule is only for regenerating
+### The submodule is only for regenerating tests
 
-`tests/src/Dates.gren`, `tests/src/Conformance.gren` and the four modules under
-`tests/src/Examples/` are **generated**, and their contents are committed, which
-is why the tests above need nothing. The conformance generator reads the TOML
-test corpus, and that is `vendor/toml-test`, a git submodule pinned to one
-commit — pinned because the generator writes the counts it found into a guard
-test, so regenerating against a moving corpus would change the file and then
-fail on it. The examples generator reads the doc comments in `src/`.
+`tests/src/Dates.gren`, `tests/src/Conformance.gren` and the four modules
+under `tests/src/Examples/` are **generated**, and the generated files are
+committed. That is why the tests above need nothing extra.
 
-The Gren they emit is not embedded in the scripts. It sits in
-`tools/templates/`, one Jinja2 template per generated module, and each script
-collects the rows and renders its template.
+The conformance generator reads the TOML test corpus from `vendor/toml-test`,
+a git submodule pinned to one commit. It is pinned because the generator
+writes the number of cases it found into a guard test. Regenerating against a
+newer corpus would change that number and fail the guard. The examples
+generator reads the doc comments in `src/`.
+
+The generators do not contain any Gren. The Gren lives in `tools/templates/`,
+one Jinja2 template per generated module. Each script gathers its data and
+renders its template.
 
 ```sh
 devbox run gen                       # all three, then gren-format on the examples
 
 python3 tools/gen-dates.py           # needs Python and Jinja2
-python3 tools/gen-conformance.py     # and the submodule
+python3 tools/gen-conformance.py     # also needs the submodule
 python3 tools/gen-examples.py        # then gren-format tests/src/Examples/
 ```
 
-**If you cloned without `--recurse-submodules`**, the tests still pass and only
-the second generator stops:
+**If you cloned without `--recurse-submodules`**, the tests still pass. Only
+the conformance generator fails:
 
 ```
 FileNotFoundError: [Errno 2] No such file or directory:
     'vendor/toml-test/tests/files-toml-1.1.0'
 ```
 
-Fix it in place, no re-clone needed:
+Fetch the submodule in place. No re-clone is needed:
 
 ```sh
 git submodule update --init
 ```
 
 `devbox run gen` reproduces every generated file byte for byte, so a diff
-after regenerating means a script and its file have drifted apart.
-`gen-conformance.py` also writes its row counts into a guard test, so an
-extractor that quietly stopped finding cases cannot produce a suite that passes
-without checking anything; `gen-examples.py` refuses to write a module it found
-no examples in, for the same reason.
+after regenerating means a script and its output have drifted apart. Two
+safeguards keep a broken generator from producing an empty suite that passes:
+`gen-conformance.py` writes the number of cases it found into a guard test,
+and `gen-examples.py` refuses to write a module in which it found no examples.
 
 ## License
 

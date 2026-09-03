@@ -17,26 +17,25 @@ module Civil.Date exposing
     , year
     )
 
-{-| A date on the calendar, with no time of day and no time zone.
+{-| A date on the Gregorian calendar, with no time of day and no time zone.
 
-`2024-02-29` is a date. It is not an instant: it did not happen at the same
-moment in Auckland as in Denver, and asking when it "was" has no answer until
-someone supplies a zone. What it is instead is a position on the Gregorian
-calendar, which is a thing worth having on its own -- a birthday, an invoice
-date, the day a file is filed under.
+`2024-02-29` is a date. It is not a moment in time: it began at different
+instants in Auckland and in Denver, and asking when it "was" has no answer
+until someone names a time zone. It is a position on the calendar, and that is
+useful on its own: a birthday, an invoice date, the day a file is filed under.
 
-Every `Date` that exists is a real date. [`fromParts`](#fromParts) and
-[`fromString`](#fromString) are the only ways to make one and both check the
-calendar, so `2023-02-29` never becomes a value and nothing downstream has to
-ask whether it might have.
+Every `Date` that exists is a real date. [`fromParts`](#fromParts),
+[`fromRataDie`](#fromRataDie) and [`fromString`](#fromString) are the only
+ways to make one, and all of them check the calendar. `2023-02-29` never
+becomes a value, so code that receives a `Date` never has to check it.
 
 
 ## Range
 
-Year 1 through year 9999, which is RFC 3339's range and therefore TOML's. Year
-zero and negative years are not dates in this module; the Gregorian calendar
-did not exist then, and proleptic arithmetic before 1582 is a convention rather
-than a fact.
+Year 1 through year 9999, which is the range RFC 3339 allows and therefore the
+range TOML allows. Year zero and negative years are not dates in this module.
+Dates before 1582 are computed as if the Gregorian calendar had always been in
+use, which is what RFC 3339 specifies.
 
 @docs Date
 
@@ -77,8 +76,7 @@ import Time
 
 {-| A date on the Gregorian calendar.
 
-Two `Date`s are `==` when they are the same day, because there is only one way
-to store one.
+Two `Date`s are `==` exactly when they are the same day.
 
 -}
 type Date
@@ -116,13 +114,13 @@ fromParts parts =
         Just (Date parts)
 
 
-{-| A date from its Rata Die day number: 1 is 0001-01-01, and every day after
-that is one more.
+{-| A date from its Rata Die day number. Rata Die is a plain count of days:
+0001-01-01 is day 1, and each later day is one more.
 
     Date.fromRataDie 738945 |> Maybe.map Date.toString
     --> Just "2024-02-29"
 
-`Nothing` outside the representable range, which is 1 through 3652059.
+`Nothing` outside 1 through 3652059, which is 9999-12-31.
 
 -}
 fromRataDie : Int -> Maybe Date
@@ -204,7 +202,8 @@ day (Date parts) =
     parts.day
 
 
-{-| The month as core's `Time.Month`, for handing to anything that speaks it.
+{-| The month as the `Time.Month` type from Gren's core library, for code that
+expects that type.
 
     Date.fromString "2024-02-29" |> Maybe.map Date.monthOf
     --> Just Time.Feb
@@ -292,9 +291,9 @@ ordinalDay ((Date parts) as date) =
     toRataDie date - toRataDie (Date { year = parts.year, month = 1, day = 1 }) + 1
 
 
-{-| The Rata Die day number: 0001-01-01 is 1, and each following day is one
-more. This is the form to do arithmetic in and to compare in, and it is what
-[`fromRataDie`](#fromRataDie) reads back.
+{-| The Rata Die day number: 0001-01-01 is day 1, and each later day is one
+more. Use it to compare dates or to do arithmetic on them;
+[`fromRataDie`](#fromRataDie) turns the result back into a date.
 
     Date.fromString "0001-01-01" |> Maybe.map Date.toRataDie
     --> Just 1
@@ -346,9 +345,9 @@ toRataDie (Date parts) =
     Date.isLeapYear 2100
     --> False
 
-Divisible by four, except centuries, except every fourth century. 2000 was the
-exception to the exception, which is why so much software written before it
-believed 2100 would be a leap year too.
+A year is a leap year when it is divisible by 4, unless it is also divisible
+by 100, unless it is also divisible by 400. So 2000 was a leap year and 2100
+will not be.
 
 -}
 isLeapYear : Int -> Bool
@@ -361,8 +360,8 @@ isLeapYear y =
     Date.daysInMonth { year = 2023, month = 2 }
     --> 28
 
-Zero for a month outside 1 to 12, so that a range check on it also rejects the
-month.
+Zero for a month outside 1 to 12, so a check of the day against this value
+also rejects a bad month.
 
 -}
 daysInMonth : { year : Int, month : Int } -> Int
@@ -422,7 +421,7 @@ daysInMonth parts =
         |> Maybe.map Date.toString
     --> Just "2024-02-29"
 
-`Nothing` if the result would leave years 1 to 9999.
+`Nothing` if the result would fall outside years 1 to 9999.
 
 -}
 addDays : Int -> Date -> Maybe Date
@@ -452,8 +451,9 @@ difference from to =
     Date.fromString "1979-05-27" |> Maybe.map Date.ordinalDay
     --> Just 147
 
-The whole string has to be the date, every field has to have exactly the digits
-shown, and the date has to exist. All of these are `Nothing`:
+The whole string has to be the date, each field has to have exactly the number
+of digits shown, and the date has to exist on the calendar. All of these are
+`Nothing`:
 
     Date.fromString "1979-5-27"     --> Nothing
     Date.fromString "01979-05-27"   --> Nothing

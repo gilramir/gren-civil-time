@@ -12,37 +12,38 @@ module Civil.DateTime exposing
     , toString
     )
 
-{-| A date and a time of day, with an offset from UTC or without one.
+{-| A date and a time of day, with or without an offset from UTC.
 
-Two things live in this type, and the difference between them is the whole
+This type holds two kinds of value, and the difference between them is the
 reason the module exists:
 
-  - A **local** date-time, `1979-05-27T07:32:00`, is a reading on a wall clock
-    and a page of a calendar. It is not a moment. Nothing can say when it
-    happened without being told where.
+  - A **local** date-time, `1979-05-27T07:32:00`, is a reading from a wall
+    clock and a calendar. It is not a moment in time. Nobody can say when it
+    happened without knowing where it happened.
   - An **offset** date-time, `1979-05-27T07:32:00-07:00`, is a moment. The
-    offset makes it one, and [`toPosix`](#toPosix) can therefore work on it and
-    not on the other.
+    offset says how far the clock was from UTC, which is enough to pin the
+    reading to one instant. [`toPosix`](#toPosix) works on offset date-times
+    and not on local ones.
 
-RFC 3339 and TOML both make the distinction and both keep the offset as it was
-written, rather than normalising everything to UTC. So does this module: an
-offset date-time remembers `-07:00`, and `Z`, `+00:00` and `-00:00` stay apart
-(see [`Civil.Offset`](Civil-Offset)).
+RFC 3339 and TOML both make this distinction, and both keep the offset as it
+was written rather than converting everything to UTC. So does this module: an
+offset date-time remembers `-07:00`, and `Z`, `+00:00` and `-00:00` stay
+distinct (see [`Civil.Offset`](Civil-Offset)).
 
 
 ## What is not here
 
-Conversion between the two. Turning `1979-05-27T07:32:00` into a moment needs a
-time zone, and a time zone needs the IANA database, which is a much larger thing
-than this package and belongs in its own. [`toPosix`](#toPosix) works on offset
-date-times only, and returns `Nothing` for the rest.
+Turning a local date-time into a moment. That needs a time zone, and a time
+zone needs the IANA time zone database, which is far larger than this package
+and belongs in one of its own. [`toPosix`](#toPosix) works on offset date-times
+only and returns `Nothing` for local ones.
 
 
 ## The examples
 
-The examples below assume `Civil.Date`, `Civil.Time` and `Civil.Offset` are
-imported as `Date`, `Time` and `Offset`, and core's `Time` as `CoreTime`,
-which is how this module imports them.
+The examples below assume that `Civil.Date`, `Civil.Time` and `Civil.Offset`
+are imported as `Date`, `Time` and `Offset`, and that core's `Time` is imported
+as `CoreTime`. That is how this module itself imports them.
 
 @docs DateTime
 
@@ -80,10 +81,11 @@ import Time as CoreTime
 
 {-| A date and a time, with or without an offset.
 
-`==` is equality of the value as written, not of the moment. A local date-time
-never equals an offset one, and `07:32:00Z` and `07:32:00+00:00` are two values,
-as they are in [`Civil.Offset`](Civil-Offset). To ask whether two offset
-date-times name the same moment, compare their [`toPosix`](#toPosix).
+`==` compares the values as written, not the moments they name. A local
+date-time never equals an offset one, and `07:32:00Z` and `07:32:00+00:00` are
+two different values, just as `Z` and `+00:00` are in
+[`Civil.Offset`](Civil-Offset). To ask whether two offset date-times name the
+same moment, compare the results of [`toPosix`](#toPosix).
 
 -}
 type DateTime
@@ -167,7 +169,7 @@ offsetOf dateTime =
             Just parts.offset
 
 
-{-| Whether this is a wall clock reading rather than a moment.
+{-| Whether this is a local date-time, one with no offset.
 -}
 isLocal : DateTime -> Bool
 isLocal dateTime =
@@ -182,20 +184,22 @@ isLocal dateTime =
 -- INSTANTS
 
 
-{-| The moment this date-time names, for one that names a moment.
+{-| The moment an offset date-time names, as a `Posix` from Gren's core `Time`
+module.
 
     DateTime.fromString "1970-01-01T00:00:00Z"
         |> Maybe.andThen DateTime.toPosix
         |> Maybe.map CoreTime.posixToMillis
     --> Just 0
 
-`Nothing` for a local date-time, which does not name one. The fraction is
-truncated to whole milliseconds, which is all a `Posix` holds.
+`Nothing` for a local date-time, which does not name a moment. The fraction is
+truncated to whole milliseconds, which is all a `Posix` can hold.
 
-A leap second lands on the following second, since `Posix` has nowhere else to
-put it. That, or an offset at the first or last day of the calendar, can name a
-moment outside years 1 to 9999; `Posix` has no such range, so the moment is
-returned, but [`fromPosix`](#fromPosix) will not read it back.
+A leap second is counted as the following second, since `Posix` has no way to
+represent one. Because of that, and because an offset on the first or last day
+of the calendar can reach past it, the result can be a moment outside years 1
+to 9999. `Posix` has no such limit, so the moment is returned, but
+[`fromPosix`](#fromPosix) returns `Nothing` for it.
 
 -}
 toPosix : DateTime -> Maybe CoreTime.Posix
@@ -222,10 +226,9 @@ toPosix dateTime =
         |> Maybe.map DateTime.toString
     --> Just "1970-01-01T00:00:00Z"
 
-`Nothing` outside years 1 to 9999, which [`toPosix`](#toPosix) can reach from
-inside them. This is UTC and only UTC; rendering a moment
-in some other zone is what the time zone database this package does not have
-would be for.
+`Nothing` for a moment outside years 1 to 9999. The result is always in UTC.
+Showing a moment in some other time zone needs the time zone database, which
+this package does not include.
 
 -}
 fromPosix : CoreTime.Posix -> Maybe DateTime
@@ -280,10 +283,10 @@ floorDiv a b =
     --> Just "1979-05-27T07:32:00Z"
 
 The date and the time may be separated by `T`, `t`, or a space, and the offset
-may be `Z` or `z` or signed hours and minutes. Everything else is as strict as
+may be `Z`, `z`, or signed hours and minutes. Everything else is as strict as
 [`Civil.Date.fromString`](Civil-Date#fromString) and
-[`Civil.Time.fromString`](Civil-Time#fromString): every field the exact number
-of digits, and no trailing anything.
+[`Civil.Time.fromString`](Civil-Time#fromString): every field has exactly the
+number of digits shown, and nothing may follow the time or the offset.
 
 -}
 fromString : String -> Maybe DateTime
@@ -359,7 +362,7 @@ splitOffset str =
 
 
 {-| Write an RFC 3339 date-time: `T` between the date and the time, seconds
-always present, and the offset as it was given.
+always present, and the offset as it was written, if there is one.
 
     DateTime.fromString "1987-07-05t17:45:00z"
         |> Maybe.map DateTime.toString

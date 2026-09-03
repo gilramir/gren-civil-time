@@ -16,34 +16,35 @@ module Civil.Time exposing
 
 {-| A time of day, with no date and no time zone.
 
-`17:45:00` is a time of day. It is not an instant and it is not a duration: it
-happens once a day everywhere, at a different moment in each place, and on the
-days a zone shifts it may happen twice or not at all. What it is instead is a
-reading on a clock, which is what a `partial-time` in RFC 3339 is and what
-someone means when they write down when a shop opens.
+`17:45:00` is a time of day. It is not a moment in time and it is not a
+duration. It comes around once a day everywhere, at a different moment in each
+place, and on the day a time zone changes its clocks it can come around twice
+or not at all. It is a reading on a clock: what RFC 3339 calls a
+`partial-time`, and what someone means when they write down when a shop opens.
 
 
-## Seconds are optional, fractions are not limited
+## Seconds are optional, fractions are unlimited
 
 TOML 1.1 makes the seconds field optional, as ISO 8601 does and RFC 3339 does
-not, and this module follows TOML: `13:37` parses, and reads back as
-`13:37:00`; the normal form always has all three fields. Neither standard puts
-a bound on the digits after the decimal point, and neither does this module.
+not. This module follows TOML: `13:37` parses, and is written back as
+`13:37:00`, because the written form always has all three fields. Neither
+standard limits the number of digits after the decimal point, and neither does
+this module.
 
-The fraction is kept exactly, however many digits it had, because throwing away
-the twelfth digit is not this module's decision to make. What it does throw away
-is trailing zeroes, so that `==` is equality of the time rather than of the
-spelling: `10:32:00.5` and `10:32:00.50` are the same value. If you need the
-spelling back, keep the source text; a value cannot hold both.
+The fraction is kept as text, however many digits it has, so nothing is
+rounded away. Trailing zeroes are dropped, so that `==` compares the time
+rather than the spelling: `10:32:00.5` and `10:32:00.50` are the same value.
+If you need the original spelling, keep the source text; a value cannot hold
+both.
 
 
 ## Leap seconds
 
 A second of `60` is accepted, because RFC 3339 allows it and a timestamp that
-records one is not malformed. It is stored and written back as `60`. This module
-does no arithmetic that would have to decide what it means --
-[`secondOfDay`](#secondOfDay) will return `86400` for `23:59:60`, and that is
-the honest answer rather than a useful one.
+records a leap second is valid. It is stored and written back as `60`. This
+module does no arithmetic that would need to decide what a leap second means:
+[`secondOfDay`](#secondOfDay) returns `86400` for `23:59:60`, one past the
+last ordinary second of the day.
 
 @docs Time
 
@@ -70,7 +71,7 @@ import Maybe exposing (Maybe(..))
 import String
 
 
-{-| A reading on a clock.
+{-| A time of day.
 -}
 type Time
     = Time
@@ -84,8 +85,8 @@ type Time
 -- CREATING
 
 
-{-| A time from its parts. The fraction is the digits that would follow the
-decimal point, without the point itself; `""` for none.
+{-| A time from its parts. The fraction is the digits after the decimal point,
+without the point itself, or `""` for no fraction.
 
     Time.fromParts { hour = 10, minute = 32, second = 0, fraction = "555" }
         |> Maybe.map Time.toString
@@ -94,8 +95,8 @@ decimal point, without the point itself; `""` for none.
 `Nothing` if the hour is outside 0 to 23, the minute outside 0 to 59, the second
 outside 0 to 60, or the fraction is anything but digits.
 
-Trailing zeroes come off the fraction, so this is the same value as one built
-with `"5550"`.
+Trailing zeroes are dropped from the fraction, so a fraction of `"5550"` gives
+the same value as `"555"`.
 
 -}
 fromParts : { hour : Int, minute : Int, second : Int, fraction : String } -> Maybe Time
@@ -187,8 +188,7 @@ millisecond time =
 
 
 {-| The fraction as whole nanoseconds, truncated. Digits past the ninth are
-lost, which is the point of the function; [`fraction`](#fraction) is the one
-that keeps them.
+dropped; [`fraction`](#fraction) keeps them all.
 
     Time.fromString "10:32:00.5" |> Maybe.map Time.nanosecond
     --> Just 500000000
@@ -217,7 +217,8 @@ fractionAsInt places (Time parts) =
     Time.fromString "01:00:00" |> Maybe.map Time.secondOfDay
     --> Just 3600
 
-A leap second gives `86400`, one past the end of the day. See the note above.
+A leap second gives `86400`, one past the last ordinary second of the day.
+See the note on leap seconds at the top of this module.
 
 -}
 secondOfDay : Time -> Int
@@ -317,9 +318,8 @@ digits text =
     Time.fromString "13:37" |> Maybe.map Time.toString
     --> Just "13:37:00"
 
-The seconds are always written, even when they were not read, because that is
-the normal form. The fraction is written with the digits it has left after the
-trailing zeroes came off.
+The seconds are always written, even when the value was read from text that
+had none. The fraction is written without its trailing zeroes.
 
 -}
 toString : Time -> String
@@ -344,9 +344,9 @@ number of places.
     Time.fromString "10:32:00.5" |> Maybe.map (Time.toStringWithPlaces 3)
     --> Just "10:32:00.500"
 
-Zero places writes no decimal point at all. This is for talking to something
-that insists on milliseconds; [`toString`](#toString) is the one to use
-otherwise.
+With zero places, no decimal point is written. Use this when the receiver
+requires a fixed number of places, such as exactly three for milliseconds.
+Otherwise use [`toString`](#toString).
 
 -}
 toStringWithPlaces : Int -> Time -> String

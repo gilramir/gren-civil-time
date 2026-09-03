@@ -29,7 +29,7 @@ suite =
         , setUp = \_ -> Task.succeed {}
         , tearDown = U.noTearDown
         , tests =
-            [ U.test "src/Civil/DateTime.gren:94" <| \_ ->
+            [ U.test "src/Civil/DateTime.gren:101" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "1979-05-27T07:32:00")
@@ -39,7 +39,7 @@ suite =
                             |> Maybe.map DateTime.toString
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:108" <| \_ ->
+            , U.test "src/Civil/DateTime.gren:115" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "1979-05-27T07:32:00-07:00")
@@ -50,7 +50,7 @@ suite =
                             |> Maybe.map DateTime.toString
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:151" <| \_ ->
+            , U.test "src/Civil/DateTime.gren:157" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just Nothing)
@@ -58,7 +58,7 @@ suite =
                             |> Maybe.map DateTime.offsetOf
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:184" <| \_ ->
+            , U.test "src/Civil/DateTime.gren:190" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just 0)
@@ -67,7 +67,7 @@ suite =
                             |> Maybe.map CoreTime.posixToMillis
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:217" <| \_ ->
+            , U.test "src/Civil/DateTime.gren:224" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "1970-01-01T00:00:00Z")
@@ -76,7 +76,7 @@ suite =
                             |> Maybe.map DateTime.toString
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:276" <| \_ ->
+            , U.test "src/Civil/DateTime.gren:281" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "1979-05-27T07:32:00Z")
@@ -84,7 +84,7 @@ suite =
                             |> Maybe.map DateTime.toString
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:360" <| \_ ->
+            , U.test "src/Civil/DateTime.gren:367" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "1987-07-05T17:45:00Z")
