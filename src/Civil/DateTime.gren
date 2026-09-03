@@ -1,9 +1,15 @@
 module Civil.DateTime exposing
     ( DateTime
-    , local, offset
-    , date, time, offsetOf, isLocal
-    , toPosix, fromPosix
-    , fromString, toString
+    , date
+    , fromPosix
+    , fromString
+    , isLocal
+    , local
+    , offset
+    , offsetOf
+    , time
+    , toPosix
+    , toString
     )
 
 {-| A date and a time of day, with an offset from UTC or without one.
@@ -30,6 +36,13 @@ Conversion between the two. Turning `1979-05-27T07:32:00` into a moment needs a
 time zone, and a time zone needs the IANA database, which is a much larger thing
 than this package and belongs in its own. [`toPosix`](#toPosix) works on offset
 date-times only, and returns `Nothing` for the rest.
+
+
+## The examples
+
+The examples below assume `Civil.Date`, `Civil.Time` and `Civil.Offset` are
+imported as `Date`, `Time` and `Offset`, and core's `Time` as `CoreTime`,
+which is how this module imports them.
 
 @docs DateTime
 
@@ -66,11 +79,16 @@ import Time as CoreTime
 
 
 {-| A date and a time, with or without an offset.
+
+`==` is equality of the value as written, not of the moment. A local date-time
+never equals an offset one, and `07:32:00Z` and `07:32:00+00:00` are two values,
+as they are in [`Civil.Offset`](Civil-Offset). To ask whether two offset
+date-times name the same moment, compare their [`toPosix`](#toPosix).
+
 -}
 type DateTime
     = Local { date : Date, time : Time }
     | Offset { date : Date, time : Time, offset : Offset }
-
 
 
 -- CREATING
@@ -103,7 +121,6 @@ local d t =
 offset : Date -> Time -> Offset -> DateTime
 offset d t o =
     Offset { date = d, time = t, offset = o }
-
 
 
 -- READING
@@ -162,7 +179,6 @@ isLocal dateTime =
             False
 
 
-
 -- INSTANTS
 
 
@@ -170,14 +186,16 @@ isLocal dateTime =
 
     DateTime.fromString "1970-01-01T00:00:00Z"
         |> Maybe.andThen DateTime.toPosix
-        |> Maybe.map Time.posixToMillis
+        |> Maybe.map CoreTime.posixToMillis
     --> Just 0
 
 `Nothing` for a local date-time, which does not name one. The fraction is
 truncated to whole milliseconds, which is all a `Posix` holds.
 
 A leap second lands on the following second, since `Posix` has nowhere else to
-put it.
+put it. That, or an offset at the first or last day of the calendar, can name a
+moment outside years 1 to 9999; `Posix` has no such range, so the moment is
+returned, but [`fromPosix`](#fromPosix) will not read it back.
 
 -}
 toPosix : DateTime -> Maybe CoreTime.Posix
@@ -199,12 +217,13 @@ toPosix dateTime =
 
 {-| The UTC date-time of a moment, written with a `Z` offset.
 
-    Time.millisToPosix 0
+    CoreTime.millisToPosix 0
         |> DateTime.fromPosix
         |> Maybe.map DateTime.toString
     --> Just "1970-01-01T00:00:00Z"
 
-`Nothing` outside years 1 to 9999. This is UTC and only UTC; rendering a moment
+`Nothing` outside years 1 to 9999, which [`toPosix`](#toPosix) can reach from
+inside them. This is UTC and only UTC; rendering a moment
 in some other zone is what the time zone database this package does not have
 would be for.
 
@@ -251,7 +270,6 @@ floorDiv a b =
     Math.floor (Basics.toFloat a / Basics.toFloat b)
 
 
-
 -- STRINGS
 
 
@@ -272,8 +290,10 @@ fromString : String -> Maybe DateTime
 fromString str =
     -- The separator is the 11th character, after a fixed-width YYYY-MM-DD.
     -- Splitting on "T" would be wrong: the offset has no T but a malformed
-    -- string might.
-    if String.count str < 11 then
+    -- string might. Positions here are UTF-16 units, which is what slice,
+    -- takeFirst and dropFirst count in; String.count counts characters and
+    -- would disagree on a string with an astral character in it.
+    if String.unitLength str < 11 then
         Nothing
 
     else
@@ -335,7 +355,7 @@ splitOffset str =
             else
                 search (index - 1)
     in
-    search (String.count str - 1)
+    search (String.unitLength str - 1)
 
 
 {-| Write an RFC 3339 date-time: `T` between the date and the time, seconds

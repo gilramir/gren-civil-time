@@ -1,10 +1,20 @@
 module Civil.Date exposing
     ( Date
-    , fromParts, fromRataDie
-    , year, month, day, monthOf, weekday, ordinalDay, toRataDie
-    , isLeapYear, daysInMonth
-    , addDays, difference
-    , fromString, toString
+    , addDays
+    , day
+    , daysInMonth
+    , difference
+    , fromParts
+    , fromRataDie
+    , fromString
+    , isLeapYear
+    , month
+    , monthOf
+    , ordinalDay
+    , toRataDie
+    , toString
+    , weekday
+    , year
     )
 
 {-| A date on the calendar, with no time of day and no time zone.
@@ -73,7 +83,6 @@ to store one.
 -}
 type Date
     = Date { year : Int, month : Int, day : Int }
-
 
 
 -- CREATING
@@ -169,7 +178,6 @@ fromRataDie rd =
                 , day = d
                 }
             )
-
 
 
 -- READING
@@ -327,7 +335,6 @@ toRataDie (Date parts) =
     era * 146097 + doe - 305
 
 
-
 -- THE CALENDAR
 
 
@@ -405,7 +412,6 @@ daysInMonth parts =
             0
 
 
-
 -- ARITHMETIC
 
 
@@ -436,7 +442,6 @@ earlier.
 difference : Date -> Date -> Int
 difference from to =
     toRataDie to - toRataDie from
-
 
 
 -- STRINGS

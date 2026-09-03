@@ -1,8 +1,16 @@
 module Civil.Offset exposing
     ( Offset
-    , zulu, plus, minus, fromMinutes
-    , toMinutes, isZulu, isNegative, hours, minutes
-    , fromString, toString
+    , fromMinutes
+    , fromString
+    , hours
+    , isNegative
+    , isZulu
+    , minus
+    , minutes
+    , plus
+    , toMinutes
+    , toString
+    , zulu
     )
 
 {-| A fixed offset from UTC, as a date-time was written down.
@@ -66,7 +74,6 @@ type Offset
     = Zulu
     | Plus { hours : Int, minutes : Int }
     | Minus { hours : Int, minutes : Int }
-
 
 
 -- CREATING
@@ -147,7 +154,6 @@ fromMinutes total =
         minus { hours = positive // 60, minutes = positive - (positive // 60) * 60 }
 
 
-
 -- READING
 
 
@@ -171,8 +177,8 @@ toMinutes offset =
             negate (parts.hours * 60 + parts.minutes)
 
 
-{-| Whether this was written `Z`, rather than as a zero offset that happens to
-be zero.
+{-| Whether this was written `Z`, rather than as an offset that happens to be
+zero.
 
     Offset.isZulu Offset.zulu
     --> True
@@ -228,7 +234,6 @@ minutes offset =
 
         Minus parts ->
             parts.minutes
-
 
 
 -- STRINGS
