@@ -1,0 +1,96 @@
+module Examples.DateTime exposing (suite)
+
+{-| The examples in the doc comments of `src/Civil/DateTime.gren`, each checked
+against the value it says it gives. An example is an indented block with a
+`-->` in it, and this file is generated from those by `tools/gen-examples.py`.
+
+@docs suite
+
+-}
+
+import Civil.Date as Date
+import Civil.DateTime as DateTime
+import Civil.Offset as Offset
+import Civil.Time as Time
+import Expect
+import Maybe exposing (Maybe(..))
+import Task
+import Test.Runner.UnitNode as U
+import Time as CoreTime
+
+
+{-| -}
+suite : U.Suite
+suite =
+    U.suite
+        { name = "Examples.DateTime"
+        , setUpSuite = U.noSuiteFixture
+        , tearDownSuite = U.noTearDown
+        , setUp = \_ -> Task.succeed {}
+        , tearDown = U.noTearDown
+        , tests =
+            [ U.test "src/Civil/DateTime.gren:94" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "1979-05-27T07:32:00")
+                        (Maybe.map2 DateTime.local
+                            (Date.fromString "1979-05-27")
+                            (Time.fromString "07:32")
+                            |> Maybe.map DateTime.toString
+                        )
+                    )
+            , U.test "src/Civil/DateTime.gren:108" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "1979-05-27T07:32:00-07:00")
+                        (Maybe.map3 DateTime.offset
+                            (Date.fromString "1979-05-27")
+                            (Time.fromString "07:32")
+                            (Offset.fromString "-07:00")
+                            |> Maybe.map DateTime.toString
+                        )
+                    )
+            , U.test "src/Civil/DateTime.gren:151" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just Nothing)
+                        (DateTime.fromString "1979-05-27T07:32:00"
+                            |> Maybe.map DateTime.offsetOf
+                        )
+                    )
+            , U.test "src/Civil/DateTime.gren:184" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just 0)
+                        (DateTime.fromString "1970-01-01T00:00:00Z"
+                            |> Maybe.andThen DateTime.toPosix
+                            |> Maybe.map CoreTime.posixToMillis
+                        )
+                    )
+            , U.test "src/Civil/DateTime.gren:217" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "1970-01-01T00:00:00Z")
+                        (CoreTime.millisToPosix 0
+                            |> DateTime.fromPosix
+                            |> Maybe.map DateTime.toString
+                        )
+                    )
+            , U.test "src/Civil/DateTime.gren:276" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "1979-05-27T07:32:00Z")
+                        (DateTime.fromString "1979-05-27 07:32Z"
+                            |> Maybe.map DateTime.toString
+                        )
+                    )
+            , U.test "src/Civil/DateTime.gren:360" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "1987-07-05T17:45:00Z")
+                        (DateTime.fromString "1987-07-05t17:45:00z"
+                            |> Maybe.map DateTime.toString
+                        )
+                    )
+            ]
+        }

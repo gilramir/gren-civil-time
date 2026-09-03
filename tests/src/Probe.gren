@@ -1,0 +1,219 @@
+module Probe exposing (main)
+
+{-| The exhaustive checks, which take seconds rather than milliseconds.
+
+`Dates` checks forty days against Python. This walks all 3,652,059 of them in
+calendar order, using nothing but `daysInMonth` to know when a month ends, and
+asks at each one that the day number, the day of the year, the weekday, the
+text and the `Posix` all agree with the walk. Then every second of one day
+through `Posix` and back, and every offset there is.
+
+Run with `./probe.sh`; it is not part of `run.sh`.
+
+-}
+
+import Array exposing (Array)
+import Civil.Date as Date
+import Civil.DateTime as DateTime
+import Civil.Offset as Offset
+import Civil.Time as Time
+import Expect
+import Math
+import Maybe exposing (Maybe(..))
+import Node
+import String
+import Task
+import Test.Runner.UnitNode as U
+import Time as CoreTime
+
+
+main : Node.SimpleProgram a
+main =
+    U.run
+        { name = "gren-civil-time probe"
+        , version = "1.0.0"
+        , suites = [ probeSuite ]
+        }
+
+
+probeSuite : U.Suite
+probeSuite =
+    U.suite
+        { name = "Probe"
+        , setUpSuite = U.noSuiteFixture
+        , tearDownSuite = U.noTearDown
+        , setUp = \_ -> Task.succeed {}
+        , tearDown = U.noTearDown
+        , tests =
+            [ U.test "every day from 0001-01-01 to 9999-12-31 agrees with the walk" <| \_ ->
+                Task.succeed
+                    (Expect.equal Nothing
+                        (walkDays
+                            { year = 1
+                            , month = 1
+                            , day = 1
+                            , rd = 1
+                            , yd = 1
+                            , weekday = 1
+                            }
+                        )
+                    )
+            , U.test "every second of a day goes through Posix and back" <| \_ ->
+                Task.succeed (Expect.equal Nothing (walkSeconds 0))
+            , U.test "every offset goes through text and back" <| \_ ->
+                Task.succeed (Expect.equal Nothing (walkOffsets -1439))
+            ]
+        }
+
+
+-- EVERY DAY
+
+
+type alias Day =
+    { year : Int
+    , month : Int
+    , day : Int
+    , rd : Int
+    , yd : Int
+    , weekday : Int
+    }
+
+
+{-| 0001-01-01 was a Monday, which `Dates` checks against Python; from there
+the walk expects each day to be one weekday later than the last.
+-}
+weekdays : Array CoreTime.Weekday
+weekdays =
+    [ CoreTime.Sun, CoreTime.Mon, CoreTime.Tue, CoreTime.Wed, CoreTime.Thu, CoreTime.Fri, CoreTime.Sat ]
+
+
+walkDays : Day -> Maybe String
+walkDays d =
+    if d.year > 9999 then
+        Nothing
+
+    else if dayAgrees d then
+        walkDays (nextDay d)
+
+    else
+        Just (String.fromInt d.year ++ "-" ++ String.fromInt d.month ++ "-" ++ String.fromInt d.day ++ ", day " ++ String.fromInt d.rd)
+
+
+nextDay : Day -> Day
+nextDay d =
+    let
+        stepped =
+            { d | rd = d.rd + 1, yd = d.yd + 1, weekday = Math.modBy 7 (d.weekday + 1) }
+    in
+    if d.day < Date.daysInMonth { year = d.year, month = d.month } then
+        { stepped | day = d.day + 1 }
+
+    else if d.month < 12 then
+        { stepped | day = 1, month = d.month + 1 }
+
+    else
+        { stepped | day = 1, month = 1, year = d.year + 1, yd = 1 }
+
+
+dayAgrees : Day -> Bool
+dayAgrees d =
+    when Date.fromParts { year = d.year, month = d.month, day = d.day } is
+        Nothing ->
+            False
+
+        Just date ->
+            let
+                midnight =
+                    (d.rd - 719163) * 86400000
+            in
+            Date.toRataDie date == d.rd
+                && Date.fromRataDie d.rd == Just date
+                && Date.ordinalDay date == d.yd
+                && Just (Date.weekday date) == Array.get d.weekday weekdays
+                && Date.fromString (Date.toString date) == Just date
+                && (CoreTime.millisToPosix midnight
+                        |> DateTime.fromPosix
+                        |> Maybe.map DateTime.toString
+                   ) == Just (Date.toString date ++ "T00:00:00Z")
+                && (CoreTime.millisToPosix midnight
+                        |> DateTime.fromPosix
+                        |> Maybe.andThen DateTime.toPosix
+                        |> Maybe.map CoreTime.posixToMillis
+                   ) == Just midnight
+
+
+-- EVERY SECOND
+
+
+walkSeconds : Int -> Maybe String
+walkSeconds s =
+    if s >= 86400 then
+        Nothing
+
+    else if secondAgrees s then
+        walkSeconds (s + 1)
+
+    else
+        Just ("second " ++ String.fromInt s)
+
+
+{-| Seven milliseconds into the second, so that the fraction is in play and
+has a leading zero to keep.
+-}
+secondAgrees : Int -> Bool
+secondAgrees s =
+    let
+        millis =
+            s * 1000 + 7
+
+        pad n =
+            String.padLeft 2 '0' (String.fromInt n)
+
+        text =
+            "1970-01-01T"
+                ++ pad (s // 3600)
+                ++ ":"
+                ++ pad (Math.modBy 60 (s // 60))
+                ++ ":"
+                ++ pad (Math.modBy 60 s)
+                ++ ".007Z"
+
+        written =
+            CoreTime.millisToPosix millis
+                |> DateTime.fromPosix
+                |> Maybe.map DateTime.toString
+    in
+    written == Just text
+        && (DateTime.fromString text
+                |> Maybe.andThen DateTime.toPosix
+                |> Maybe.map CoreTime.posixToMillis
+           ) == Just millis
+
+
+-- EVERY OFFSET
+
+
+walkOffsets : Int -> Maybe String
+walkOffsets m =
+    if m > 1439 then
+        Nothing
+
+    else if offsetAgrees m then
+        walkOffsets (m + 1)
+
+    else
+        Just ("offset " ++ String.fromInt m)
+
+
+offsetAgrees : Int -> Bool
+offsetAgrees m =
+    when Offset.fromMinutes m is
+        Nothing ->
+            False
+
+        Just o ->
+            Offset.toMinutes o == m
+                && Offset.fromString (Offset.toString o) == Just o
+                && Offset.hours o * 60 + Offset.minutes o == Math.abs m
+                && Offset.isNegative o == (m < 0)
+                && not (Offset.isZulu o)

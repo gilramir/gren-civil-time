@@ -2,4 +2,5 @@
 .gren
 gren_packages/
 tests/app
+tests/probe
 *.swp

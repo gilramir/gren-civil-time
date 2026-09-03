@@ -1,0 +1,94 @@
+module Examples.Offset exposing (suite)
+
+{-| The examples in the doc comments of `src/Civil/Offset.gren`, each checked
+against the value it says it gives. An example is an indented block with a
+`-->` in it, and this file is generated from those by `tools/gen-examples.py`.
+
+@docs suite
+
+-}
+
+import Civil.Offset as Offset
+import Expect
+import Maybe exposing (Maybe(..))
+import Task
+import Test.Runner.UnitNode as U
+
+
+{-| -}
+suite : U.Suite
+suite =
+    U.suite
+        { name = "Examples.Offset"
+        , setUpSuite = U.noSuiteFixture
+        , tearDownSuite = U.noTearDown
+        , setUp = \_ -> Task.succeed {}
+        , tearDown = U.noTearDown
+        , tests =
+            [ U.test "src/Civil/Offset.gren:77" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        ("Z")
+                        (Offset.toString Offset.zulu
+                        )
+                    )
+            , U.test "src/Civil/Offset.gren:88" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "+05:30")
+                        (Offset.plus { hours = 5, minutes = 30 }
+                            |> Maybe.map Offset.toString
+                        )
+                    )
+            , U.test "src/Civil/Offset.gren:106" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "-07:00")
+                        (Offset.minus { hours = 7, minutes = 0 }
+                            |> Maybe.map Offset.toString
+                        )
+                    )
+            , U.test "src/Civil/Offset.gren:130" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "-07:00")
+                        (Offset.fromMinutes -420 |> Maybe.map Offset.toString
+                        )
+                    )
+            , U.test "src/Civil/Offset.gren:157" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just -420)
+                        (Offset.fromString "-07:00" |> Maybe.map Offset.toMinutes
+                        )
+                    )
+            , U.test "src/Civil/Offset.gren:177" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (True)
+                        (Offset.isZulu Offset.zulu
+                        )
+                    )
+            , U.test "src/Civil/Offset.gren:189" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just True)
+                        (Offset.fromString "-00:00" |> Maybe.map Offset.isNegative
+                        )
+                    )
+            , U.test "src/Civil/Offset.gren:239" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just 765)
+                        (Offset.fromString "+12:45" |> Maybe.map Offset.toMinutes
+                        )
+                    )
+            , U.test "src/Civil/Offset.gren:295" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "+12:45")
+                        (Offset.fromMinutes 765 |> Maybe.map Offset.toString
+                        )
+                    )
+            ]
+        }

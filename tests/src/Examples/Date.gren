@@ -1,0 +1,162 @@
+module Examples.Date exposing (suite)
+
+{-| The examples in the doc comments of `src/Civil/Date.gren`, each checked
+against the value it says it gives. An example is an indented block with a
+`-->` in it, and this file is generated from those by `tools/gen-examples.py`.
+
+@docs suite
+
+-}
+
+import Civil.Date as Date
+import Expect
+import Maybe exposing (Maybe(..))
+import Task
+import Test.Runner.UnitNode as U
+import Time
+
+
+{-| -}
+suite : U.Suite
+suite =
+    U.suite
+        { name = "Examples.Date"
+        , setUpSuite = U.noSuiteFixture
+        , tearDownSuite = U.noTearDown
+        , setUp = \_ -> Task.succeed {}
+        , tearDown = U.noTearDown
+        , tests =
+            [ U.test "src/Civil/Date.gren:84" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "2024-02-29")
+                        (Date.fromParts { year = 2024, month = 2, day = 29 }
+                            |> Maybe.map Date.toString
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:91" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Nothing)
+                        (Date.fromParts { year = 2100, month = 2, day = 29 }
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:113" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "2024-02-29")
+                        (Date.fromRataDie 738945 |> Maybe.map Date.toString
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:201" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just Time.Feb)
+                        (Date.fromString "2024-02-29" |> Maybe.map Date.monthOf
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:247" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just Time.Thu)
+                        (Date.fromString "2024-02-29" |> Maybe.map Date.weekday
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:278" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just 61)
+                        (Date.fromString "2024-03-01" |> Maybe.map Date.ordinalDay
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:291" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just 1)
+                        (Date.fromString "0001-01-01" |> Maybe.map Date.toRataDie
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:336" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (True)
+                        (Date.isLeapYear 2000
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:339" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (False)
+                        (Date.isLeapYear 2100
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:354" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (28)
+                        (Date.daysInMonth { year = 2023, month = 2 }
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:414" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "2024-02-29")
+                        (Date.fromString "2024-02-28"
+                            |> Maybe.andThen (Date.addDays 1)
+                            |> Maybe.map Date.toString
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:430" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just 2)
+                        (Maybe.map2 Date.difference
+                            (Date.fromString "2024-02-28")
+                            (Date.fromString "2024-03-01")
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:447" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just 147)
+                        (Date.fromString "1979-05-27" |> Maybe.map Date.ordinalDay
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:453" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Nothing)
+                        (Date.fromString "1979-5-27"
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:454" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Nothing)
+                        (Date.fromString "01979-05-27"
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:455" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Nothing)
+                        (Date.fromString "1979-05-27T00"
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:456" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Nothing)
+                        (Date.fromString "1979-02-30"
+                        )
+                    )
+            , U.test "src/Civil/Date.gren:489" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Just "0007-01-02")
+                        (Date.fromParts { year = 7, month = 1, day = 2 }
+                            |> Maybe.map Date.toString
+                        )
+                    )
+            ]
+        }

@@ -74,45 +74,65 @@ git clone <this repo>     # --recurse-submodules is optional here; see below
 devbox run test
 ```
 
-36 checks, in a few milliseconds, with **no submodule and no network needed**.
+99 checks, in a few milliseconds, with **no submodule and no network needed**.
 The fixtures are committed, so a plain `git clone` is enough to run everything:
 
 ```
-Dates            ok    14/14  (3 ms)
-Clocks           ok    19/19  (2 ms)
-Conformance      ok     3/3   (1 ms)
+Dates              ok    17/17  (4 ms)
+Clocks             ok    32/32  (3 ms)
+Conformance        ok     3/3   (1 ms)
+Examples.Date      ok    18/18  (1 ms)
+Examples.Time      ok    13/13  (0 ms)
+Examples.Offset    ok     9/9   (1 ms)
+Examples.DateTime  ok     7/7   (0 ms)
 
-Ran 36 tests in 6 ms
+Ran 99 tests in 10 ms
 
-OK — 36 passed
+OK — 99 passed
 ```
 
 What they check:
 
 | suite | against |
 |---|---|
-| `Dates` | Python's `datetime.date`, whose `toordinal` is Rata Die on the same epoch — forty dates, ten where things break and thirty at random across the whole range |
-| `Clocks` | the promises past what TOML exercises: the three zero offsets, the fraction, leap seconds, the `Posix` round trip on both sides of the epoch |
+| `Dates` | Python's `datetime.date`, whose `toordinal` is Rata Die on the same epoch — forty dates, ten where things break and thirty at random across the whole range; plus the constructor and the accessors called directly |
+| `Clocks` | the promises past what TOML exercises: the three zero offsets, the fraction, leap seconds, the `Posix` round trip on both sides of the epoch, `toPosix` against Python on real offsets, and what a digit is |
 | `Conformance` | every date and time in the official [toml-test](https://github.com/toml-lang/toml-test) suite — 32 that must parse and 70 that must not |
+| `Examples.*` | every `-->` example in the doc comments, 47 of them, checked against the value it claims |
+
+### The slow checks
+
+```sh
+devbox run probe
+```
+
+`tests/src/Probe.gren` walks all 3,652,059 days of the calendar in order,
+knowing only how long each month is, and asks at every one that the day
+number, the day of the year, the weekday, the text and the `Posix` all agree
+with the walk. Then every second of a day through `Posix` and back, and every
+offset through text and back. About ten seconds, which is why it has its own
+runner and is not in `devbox run test`.
 
 ### The submodule is only for regenerating
 
-`tests/src/Dates.gren` and `tests/src/Conformance.gren` are **generated**, and
-their contents are committed, which is why the tests above need nothing. The
-second generator reads the TOML test corpus, and that is `vendor/toml-test`, a
-git submodule pinned to one commit — pinned because the generator writes the
-counts it found into a guard test, so regenerating against a moving corpus would
-change the file and then fail on it.
+`tests/src/Dates.gren`, `tests/src/Conformance.gren` and the four modules under
+`tests/src/Examples/` are **generated**, and their contents are committed, which
+is why the tests above need nothing. The conformance generator reads the TOML
+test corpus, and that is `vendor/toml-test`, a git submodule pinned to one
+commit — pinned because the generator writes the counts it found into a guard
+test, so regenerating against a moving corpus would change the file and then
+fail on it. The examples generator reads the doc comments in `src/`.
 
 The Gren they emit is not embedded in the scripts. It sits in
 `tools/templates/`, one Jinja2 template per generated module, and each script
 collects the rows and renders its template.
 
 ```sh
-devbox run gen                       # both of them
+devbox run gen                       # all three, then gren-format on the examples
 
 python3 tools/gen-dates.py           # needs Python and Jinja2
 python3 tools/gen-conformance.py     # and the submodule
+python3 tools/gen-examples.py        # then gren-format tests/src/Examples/
 ```
 
 **If you cloned without `--recurse-submodules`**, the tests still pass and only
@@ -129,10 +149,12 @@ Fix it in place, no re-clone needed:
 git submodule update --init
 ```
 
-Both scripts reproduce their file byte for byte, so a diff after regenerating
-means the script and the file have drifted apart. `gen-conformance.py` also
-writes its row counts into a guard test, so an extractor that quietly stopped
-finding cases cannot produce a suite that passes without checking anything.
+`devbox run gen` reproduces every generated file byte for byte, so a diff
+after regenerating means a script and its file have drifted apart.
+`gen-conformance.py` also writes its row counts into a guard test, so an
+extractor that quietly stopped finding cases cannot produce a suite that passes
+without checking anything; `gen-examples.py` refuses to write a module it found
+no examples in, for the same reason.
 
 ## License
 

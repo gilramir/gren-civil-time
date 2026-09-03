@@ -8,6 +8,8 @@ module Main exposing (main)
     exercises: the three zero offsets, the fraction, and the Posix round trip.
   - `Conformance` is every date and time in the official TOML test suite, the
     ones that must parse and the ones that must not.
+  - `Examples.*` are the examples in the doc comments of each module, checked
+    against the values they claim.
 
 Run with `./run.sh`.
 
@@ -16,6 +18,10 @@ Run with `./run.sh`.
 import Clocks exposing (clocksSuite)
 import Conformance exposing (conformanceSuite)
 import Dates exposing (datesSuite)
+import Examples.Date
+import Examples.DateTime
+import Examples.Offset
+import Examples.Time
 import Node
 import Test.Runner.UnitNode as U
 
@@ -29,5 +35,9 @@ main =
             [ datesSuite
             , clocksSuite
             , conformanceSuite
+            , Examples.Date.suite
+            , Examples.Time.suite
+            , Examples.Offset.suite
+            , Examples.DateTime.suite
             ]
         }

@@ -209,6 +209,40 @@ datesSuite =
                         , Maybe.map2 Date.difference (date "2024-03-01") (date "2024-03-01")
                         ]
                     )
+            -- THE PARTS, WITHOUT GOING THROUGH TEXT
+            , U.test "fromParts checks the year, the month and the day against the calendar" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        [ Just "2024-02-29", Just "0001-01-01", Just "9999-12-31", Nothing, Nothing, Nothing, Nothing, Nothing, Nothing ]
+                        (Array.map (\p -> Maybe.map Date.toString (Date.fromParts p))
+                            [ { year = 2024, month = 2, day = 29 }
+                            , { year = 1, month = 1, day = 1 }
+                            , { year = 9999, month = 12, day = 31 }
+                            , { year = 0, month = 1, day = 1 }
+                            , { year = 10000, month = 1, day = 1 }
+                            , { year = 2024, month = 13, day = 1 }
+                            , { year = 2024, month = 0, day = 1 }
+                            , { year = 2023, month = 2, day = 29 }
+                            , { year = 2024, month = 4, day = 31 }
+                            ]
+                        )
+                    )
+            , U.test "year, month and day read back what went in" <| \_ ->
+                Task.succeed
+                    (Expect.equal (Just { y = 2024, m = 2, d = 29 })
+                        (Date.fromParts { year = 2024, month = 2, day = 29 }
+                            |> Maybe.map (\d -> { y = Date.year d, m = Date.month d, d = Date.day d })
+                        )
+                    )
+            , U.test "monthOf names all twelve months, in order" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        (Array.map Just [ Time.Jan, Time.Feb, Time.Mar, Time.Apr, Time.May, Time.Jun, Time.Jul, Time.Aug, Time.Sep, Time.Oct, Time.Nov, Time.Dec ])
+                        (Array.map
+                            (\m -> Maybe.map Date.monthOf (Date.fromParts { year = 2024, month = m, day = 1 }))
+                            [ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 ]
+                        )
+                    )
             ]
         }
 

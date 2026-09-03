@@ -1,0 +1,42 @@
+module {{ module }} exposing (suite)
+
+{-| The examples in the doc comments of `{{ source }}`, each checked
+against the value it says it gives. An example is an indented block with a
+`-->` in it, and this file is generated from those by `tools/gen-examples.py`.
+
+@docs suite
+
+-}
+
+{% for line in imports %}
+{{ line }}
+{% endfor %}
+import Expect
+import Maybe exposing (Maybe(..))
+import Task
+import Test.Runner.UnitNode as U
+
+
+{-| -}
+suite : U.Suite
+suite =
+    U.suite
+        { name = "{{ module }}"
+        , setUpSuite = U.noSuiteFixture
+        , tearDownSuite = U.noTearDown
+        , setUp = \_ -> Task.succeed {}
+        , tearDown = U.noTearDown
+        , tests =
+{% for ex in examples %}
+            {{ "[" if loop.first else "," }} U.test "{{ ex.where }}" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        ({{ ex.expected }})
+{% for line in ex.expression %}
+                        {{ "(" if loop.first else "    " }}{{ line }}
+{% endfor %}
+                        )
+                    )
+{% endfor %}
+            ]
+        }

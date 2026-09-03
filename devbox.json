@@ -19,7 +19,12 @@
       ],
       "gen": [
         "python3 tools/gen-dates.py",
-        "python3 tools/gen-conformance.py"
+        "python3 tools/gen-conformance.py",
+        "python3 tools/gen-examples.py",
+        "gren-format tests/src/Examples/"
+      ],
+      "probe": [
+        "cd tests && ./probe.sh"
       ]
     }
   }

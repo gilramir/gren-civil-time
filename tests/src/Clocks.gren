@@ -189,6 +189,7 @@ clocksSuite =
                         , Just "1969-12-31T23:59:59Z"
                         , Just "1969-12-31T23:59:59.999Z"
                         , Just "2024-02-29T12:34:56.078Z"
+                        , Just "0001-01-01T00:00:00Z"
                         ]
                         (Array.map
                             (\ms ->
@@ -196,7 +197,7 @@ clocksSuite =
                                     |> DateTime.fromPosix
                                     |> Maybe.map DateTime.toString
                             )
-                            [ 0, -1000, -1, 1709210096078 ]
+                            [ 0, -1000, -1, 1709210096078, -62135596800000 ]
                         )
                     )
             , U.test "the Posix range stops where the calendar does" <| \_ ->
@@ -233,8 +234,184 @@ clocksSuite =
                             ]
                         )
                     )
+            , U.test "the offset follows the time directly, with nothing between or after" <| \_ ->
+                Task.succeed
+                    (Expect.equal (Array.repeat 3 Nothing)
+                        (Array.map (\s -> Maybe.map DateTime.toString (DateTime.fromString s))
+                            [ "1979-05-27T07:32:00 Z"
+                            , "1979-05-27T07:32:00 +05:30"
+                            , "1979-05-27T07:32:00Z "
+                            ]
+                        )
+                    )
+            -- THE CONSTRUCTORS, CALLED DIRECTLY
+            , U.test "plus and minus check their parts, and minus keeps its sign at zero" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just "+05:30", Just "-00:00", Nothing, Nothing, Nothing ]
+                        [ Maybe.map Offset.toString (Offset.plus { hours = 5, minutes = 30 })
+                        , Maybe.map Offset.toString (Offset.minus { hours = 0, minutes = 0 })
+                        , Maybe.map Offset.toString (Offset.plus { hours = 24, minutes = 0 })
+                        , Maybe.map Offset.toString (Offset.minus { hours = 1, minutes = 60 })
+                        , Maybe.map Offset.toString (Offset.plus { hours = -1, minutes = 0 })
+                        ]
+                    )
+            , U.test "hours and minutes read the parts back without the sign" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just { h = 5, m = 30 }, Just { h = 7, m = 0 }, Just { h = 0, m = 0 } ]
+                        (Array.map
+                            (\s -> Maybe.map (\o -> { h = Offset.hours o, m = Offset.minutes o }) (Offset.fromString s))
+                            [ "+05:30", "-07:00", "Z" ]
+                        )
+                    )
+            , U.test "Time.fromParts checks each field and trims the fraction it is given" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just "10:32:00", Just "10:32:00.05", Just "23:59:60", Nothing, Nothing, Nothing, Nothing, Nothing ]
+                        (Array.map (\p -> Maybe.map Time.toString (Time.fromParts p))
+                            [ { hour = 10, minute = 32, second = 0, fraction = "000" }
+                            , { hour = 10, minute = 32, second = 0, fraction = "0500" }
+                            , { hour = 23, minute = 59, second = 60, fraction = "" }
+                            , { hour = -1, minute = 0, second = 0, fraction = "" }
+                            , { hour = 24, minute = 0, second = 0, fraction = "" }
+                            , { hour = 0, minute = 60, second = 0, fraction = "" }
+                            , { hour = 0, minute = 0, second = 61, fraction = "" }
+                            , { hour = 0, minute = 0, second = 0, fraction = "1.5" }
+                            ]
+                        )
+                    )
+            , U.test "so a time from parts and one from text are the same value" <| \_ ->
+                Task.succeed
+                    (Expect.equal (Just True)
+                        (Maybe.map2 (==)
+                            (Time.fromString "10:32:00.5")
+                            (Time.fromParts { hour = 10, minute = 32, second = 0, fraction = "50" })
+                        )
+                    )
+            , U.test "hour, minute and second read back what went in, and midnight is all zeroes" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just { h = 23, m = 59, s = 60 }, Just { h = 0, m = 0, s = 0 } ]
+                        [ Maybe.map clockParts (Time.fromString "23:59:60")
+                        , Just (clockParts Time.midnight)
+                        ]
+                    )
+            -- A DIGIT IS AN ASCII DIGIT, AND A SIGN IS NOT ONE
+            , U.test "a sign is refused even where String.toInt would take it" <| \_ ->
+                Task.succeed
+                    (Expect.equal (Array.repeat 4 Nothing)
+                        [ Maybe.map Time.toString (Time.fromString "-1:00:00")
+                        , Maybe.map Time.toString (Time.fromString "10:32:00.+5")
+                        , Maybe.map Time.toString (Time.fromParts { hour = 1, minute = 1, second = 1, fraction = "+5" })
+                        , Maybe.map Offset.toString (Offset.fromString "+-1:00")
+                        ]
+                    )
+            , U.test "and so are digits from other scripts, and a dash that is not a hyphen" <| \_ ->
+                Task.succeed
+                    (Expect.equal (Array.repeat 4 Nothing)
+                        [ Maybe.map Time.toString (Time.fromString "10:32:00.٥")
+                        , Maybe.map Offset.toString (Offset.fromString "+０5:00")
+                        , Maybe.map DateTime.toString (DateTime.fromString "١٩٧٩-05-27T07:32:00Z")
+                        , Maybe.map DateTime.toString (DateTime.fromString "1979−05-27T07:32:00Z")
+                        ]
+                    )
+            -- THE PIECES AND THE WHOLE
+            , U.test "local and offset build a date-time from its pieces" <| \_ ->
+                Task.succeed
+                    (Expect.equal [ Just "1979-05-27T07:32:00", Just "1979-05-27T07:32:00-07:00" ]
+                        [ Maybe.map2 DateTime.local (Date.fromString "1979-05-27") (Time.fromString "07:32")
+                            |> Maybe.map DateTime.toString
+                        , Maybe.map3 DateTime.offset (Date.fromString "1979-05-27") (Time.fromString "07:32") (Offset.fromString "-07:00")
+                            |> Maybe.map DateTime.toString
+                        ]
+                    )
+            , U.test "and date, time, offsetOf and isLocal take one apart" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        [ Just { date = "1979-05-27", time = "07:32:00", offset = Just "-07:00", isLocal = False }
+                        , Just { date = "1979-05-27", time = "07:32:00.5", offset = Nothing, isLocal = True }
+                        ]
+                        (Array.map (\s -> Maybe.map pieces (DateTime.fromString s))
+                            [ "1979-05-27T07:32:00-07:00", "1979-05-27T07:32:00.5" ]
+                        )
+                    )
+            , U.test "== is equality of the spelling; the same moment is a toPosix question" <| \_ ->
+                Task.succeed
+                    (Expect.equal { spelling = False, local = False, moment = Just True }
+                        { spelling = DateTime.fromString "1979-05-27T07:32:00Z" == DateTime.fromString "1979-05-27T07:32:00+00:00"
+                        , local = DateTime.fromString "1979-05-27T07:32:00" == DateTime.fromString "1979-05-27T07:32:00Z"
+                        , moment =
+                            Maybe.map2 (\a b -> DateTime.toPosix a == DateTime.toPosix b)
+                                (DateTime.fromString "1979-05-27T07:32:00Z")
+                                (DateTime.fromString "1979-05-27T07:32:00+00:00")
+                        }
+                    )
+            -- TOPOSIX, AGAINST PYTHON
+            , U.test "toPosix agrees with Python on real dates, offsets and fractions" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        [ Just 296638320999
+                        , Just 296618520000
+                        , Just -62135596800000
+                        , Just 253402300799000
+                        , Just 1709161200000
+                        , Just -14168540000
+                        ]
+                        (Array.map posixOf
+                            [ "1979-05-27T00:32:00.999999-07:00"
+                            , "1979-05-27T07:32:00+05:30"
+                            , "0001-01-01T00:00:00+00:00"
+                            , "9999-12-31T23:59:59-00:00"
+                            , "2024-02-29T12:00:00+13:00"
+                            , "1969-07-20T20:17:40-04:00"
+                            ]
+                        )
+                    )
+            , U.test "toPosix can leave the calendar, and fromPosix then refuses to come back" <| \_ ->
+                Task.succeed
+                    (Expect.equal
+                        { millis = [ Just -62135614800000, Just 253402300800000 ]
+                        , back = [ Just Nothing, Just Nothing ]
+                        }
+                        { millis = Array.map posixOf edges
+                        , back =
+                            Array.map
+                                (\s ->
+                                    DateTime.fromString s
+                                        |> Maybe.andThen DateTime.toPosix
+                                        |> Maybe.map (\p -> Maybe.map DateTime.toString (DateTime.fromPosix p))
+                                )
+                                edges
+                        }
+                    )
             ]
         }
+
+
+{-| The first moment of the calendar seen from east of Greenwich, and the leap
+second at the end of it: both name a moment outside years 1 to 9999.
+-}
+edges : Array String
+edges =
+    [ "0001-01-01T00:00:00+05:00", "9999-12-31T23:59:60Z" ]
+
+
+posixOf : String -> Maybe Int
+posixOf text =
+    DateTime.fromString text
+        |> Maybe.andThen DateTime.toPosix
+        |> Maybe.map CoreTime.posixToMillis
+
+
+clockParts : Time.Time -> { h : Int, m : Int, s : Int }
+clockParts t =
+    { h = Time.hour t, m = Time.minute t, s = Time.second t }
+
+
+pieces : DateTime.DateTime -> { date : String, time : String, offset : Maybe String, isLocal : Bool }
+pieces dt =
+    { date = Date.toString (DateTime.date dt)
+    , time = Time.toString (DateTime.time dt)
+    , offset = Maybe.map Offset.toString (DateTime.offsetOf dt)
+    , isLocal = DateTime.isLocal dt
+    }
 
 
 {-| Moments on both sides of the epoch, at the second and inside it, where a
@@ -242,4 +419,4 @@ truncating division would round the wrong way.
 -}
 millis : Array Int
 millis =
-    [ 0, 1, -1, 999, -999, 1000, -1000, 1709210096078, -2208988800000, 253402300799999 ]
+    [ 0, 1, -1, 999, -999, 1000, -1000, 1709210096078, -2208988800000, -62135596800000, 253402300799999 ]

@@ -6,12 +6,14 @@ files listed in the 1.1.0 manifest, and pairs each valid .toml value with the
 expected value from its .json sibling. The Gren itself lives in
 tools/templates/Conformance.gren.
 
-Two normalisations are applied to the expected strings, both so that the Gren
-suite can compare text and say something useful when it differs:
+One normalisation is applied to the expected strings, so that the Gren suite
+can compare text and say something useful when it differs: toml-test writes a
+fraction to three places (.600) and this package strips trailing zeroes (.6).
+toml-test itself compares datetimes by parsing them, so the two agree where it
+counts.
 
-  * toml-test writes a fraction to three places (.600); this package strips
-    trailing zeroes (.6). toml-test itself compares datetimes by parsing them,
-    so the two agree where it counts.
+An invalid file contributes its first assignment only; every file in these
+directories has exactly one.
 
 The counts in the guard test are written from the tables, so an extractor that
 silently stopped finding cases cannot produce a file that passes.
