@@ -25,14 +25,14 @@ suite =
         , setUp = \_ -> Task.succeed {}
         , tearDown = U.noTearDown
         , tests =
-            [ U.test "src/Civil/Offset.gren:83" <| \_ ->
+            [ U.test "zulu: Offset.toString Offset.zulu" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         ("Z")
                         (Offset.toString Offset.zulu
                         )
                     )
-            , U.test "src/Civil/Offset.gren:94" <| \_ ->
+            , U.test "plus: Offset.plus { hours = 5, minutes = 30 } |> Maybe.map Offset.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "+05:30")
@@ -40,7 +40,7 @@ suite =
                             |> Maybe.map Offset.toString
                         )
                     )
-            , U.test "src/Civil/Offset.gren:112" <| \_ ->
+            , U.test "minus: Offset.minus { hours = 7, minutes = 0 } |> Maybe.map Offset.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "-07:00")
@@ -48,42 +48,42 @@ suite =
                             |> Maybe.map Offset.toString
                         )
                     )
-            , U.test "src/Civil/Offset.gren:136" <| \_ ->
+            , U.test "fromMinutes: Offset.fromMinutes -420 |> Maybe.map Offset.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "-07:00")
                         (Offset.fromMinutes -420 |> Maybe.map Offset.toString
                         )
                     )
-            , U.test "src/Civil/Offset.gren:162" <| \_ ->
+            , U.test "toMinutes: Offset.fromString \"-07:00\" |> Maybe.map Offset.toMinutes" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just -420)
                         (Offset.fromString "-07:00" |> Maybe.map Offset.toMinutes
                         )
                     )
-            , U.test "src/Civil/Offset.gren:182" <| \_ ->
+            , U.test "isZulu: Offset.isZulu Offset.zulu" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (True)
                         (Offset.isZulu Offset.zulu
                         )
                     )
-            , U.test "src/Civil/Offset.gren:194" <| \_ ->
+            , U.test "isNegative: Offset.fromString \"-00:00\" |> Maybe.map Offset.isNegative" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just True)
                         (Offset.fromString "-00:00" |> Maybe.map Offset.isNegative
                         )
                     )
-            , U.test "src/Civil/Offset.gren:243" <| \_ ->
+            , U.test "fromString: Offset.fromString \"+12:45\" |> Maybe.map Offset.toMinutes" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just 765)
                         (Offset.fromString "+12:45" |> Maybe.map Offset.toMinutes
                         )
                     )
-            , U.test "src/Civil/Offset.gren:300" <| \_ ->
+            , U.test "toString: Offset.fromMinutes 765 |> Maybe.map Offset.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "+12:45")

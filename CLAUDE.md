@@ -105,3 +105,9 @@ and is deliberately not in `run.sh`; the fast suite must stay fast.
 The conformance table's row counts are written into a guard test by the
 generator. Do not hand-edit them — an extractor that silently found nothing
 would otherwise produce a suite that passes without checking anything.
+
+A test name has to name the test, not where it sits. A name with a line number
+in it moves whenever anything above it changes, and a name that moves cannot be
+followed from one run to the next. The examples are named for what they
+document and the expression they check; `gen-examples.py` refuses to generate
+two tests under one name, for the same reason.

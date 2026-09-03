@@ -25,7 +25,7 @@ suite =
         , setUp = \_ -> Task.succeed {}
         , tearDown = U.noTearDown
         , tests =
-            [ U.test "src/Civil/Time.gren:99" <| \_ ->
+            [ U.test "fromParts: Time.fromParts { hour = 10, minute = 32, second = 0, fraction = \"555\" } |> Maybe.map Time.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "10:32:00.555")
@@ -33,7 +33,7 @@ suite =
                             |> Maybe.map Time.toString
                         )
                     )
-            , U.test "src/Civil/Time.gren:114" <| \_ ->
+            , U.test "fromParts: Time.fromParts { hour = 10, minute = 32, second = 0, fraction = \"05\" } |> Maybe.map Time.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "10:32:00.05")
@@ -41,84 +41,84 @@ suite =
                             |> Maybe.map Time.toString
                         )
                     )
-            , U.test "src/Civil/Time.gren:194" <| \_ ->
+            , U.test "fraction: Time.fromString \"10:32:00.5500\" |> Maybe.map Time.fraction" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "55")
                         (Time.fromString "10:32:00.5500" |> Maybe.map Time.fraction
                         )
                     )
-            , U.test "src/Civil/Time.gren:205" <| \_ ->
+            , U.test "millisecond: Time.fromString \"10:32:00.5559\" |> Maybe.map Time.millisecond" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just 555)
                         (Time.fromString "10:32:00.5559" |> Maybe.map Time.millisecond
                         )
                     )
-            , U.test "src/Civil/Time.gren:217" <| \_ ->
+            , U.test "nanosecond: Time.fromString \"10:32:00.5\" |> Maybe.map Time.nanosecond" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just 500000000)
                         (Time.fromString "10:32:00.5" |> Maybe.map Time.nanosecond
                         )
                     )
-            , U.test "src/Civil/Time.gren:241" <| \_ ->
+            , U.test "secondOfDay: Time.fromString \"01:00:00\" |> Maybe.map Time.secondOfDay" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just 3600)
                         (Time.fromString "01:00:00" |> Maybe.map Time.secondOfDay
                         )
                     )
-            , U.test "src/Civil/Time.gren:258" <| \_ ->
+            , U.test "fromString: Time.fromString \"13:37\" |> Maybe.map Time.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "13:37:00")
                         (Time.fromString "13:37" |> Maybe.map Time.toString
                         )
                     )
-            , U.test "src/Civil/Time.gren:264" <| \_ ->
+            , U.test "fromString: Time.fromString \"1:37:00\"" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Nothing)
                         (Time.fromString "1:37:00"
                         )
                     )
-            , U.test "src/Civil/Time.gren:265" <| \_ ->
+            , U.test "fromString: Time.fromString \"13:37:00.\"" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Nothing)
                         (Time.fromString "13:37:00."
                         )
                     )
-            , U.test "src/Civil/Time.gren:266" <| \_ ->
+            , U.test "fromString: Time.fromString \"133700\"" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Nothing)
                         (Time.fromString "133700"
                         )
                     )
-            , U.test "src/Civil/Time.gren:267" <| \_ ->
+            , U.test "fromString: Time.fromString \"13:37:00Z\"" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Nothing)
                         (Time.fromString "13:37:00Z"
                         )
                     )
-            , U.test "src/Civil/Time.gren:342" <| \_ ->
+            , U.test "toString: Time.fromString \"13:37\" |> Maybe.map Time.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "13:37:00")
                         (Time.fromString "13:37" |> Maybe.map Time.toString
                         )
                     )
-            , U.test "src/Civil/Time.gren:365" <| \_ ->
+            , U.test "toStringWithPlaces: Time.fromString \"13:37\" |> Maybe.map (Time.toStringWithPlaces 3)" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "13:37:00.000")
                         (Time.fromString "13:37" |> Maybe.map (Time.toStringWithPlaces 3)
                         )
                     )
-            , U.test "src/Civil/Time.gren:368" <| \_ ->
+            , U.test "toStringWithPlaces: Time.fromString \"10:32:00.5\" |> Maybe.map (Time.toStringWithPlaces 3)" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "10:32:00.500")

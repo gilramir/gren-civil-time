@@ -28,7 +28,7 @@ suite =
         , tearDown = U.noTearDown
         , tests =
 {% for ex in examples %}
-            {{ "[" if loop.first else "," }} U.test "{{ ex.where }}" <| \_ ->
+            {{ "[" if loop.first else "," }} U.test "{{ ex.name | quoted }}" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         ({{ ex.expected }})

@@ -29,7 +29,7 @@ suite =
         , setUp = \_ -> Task.succeed {}
         , tearDown = U.noTearDown
         , tests =
-            [ U.test "src/Civil/DateTime.gren:101" <| \_ ->
+            [ U.test "local: Maybe.map2 DateTime.local (Date.fromString \"1979-05-27\") (Time.fromString \"07:32\") |> Maybe.map DateTime.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "1979-05-27T07:32:00")
@@ -39,7 +39,7 @@ suite =
                             |> Maybe.map DateTime.toString
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:115" <| \_ ->
+            , U.test "offset: Maybe.map3 DateTime.offset (Date.fromString \"1979-05-27\") (Time.fromString \"07:32\") (Offset.fromString \"-07:00\") |> Maybe.map DateTime.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "1979-05-27T07:32:00-07:00")
@@ -50,7 +50,7 @@ suite =
                             |> Maybe.map DateTime.toString
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:157" <| \_ ->
+            , U.test "offsetOf: DateTime.fromString \"1979-05-27T07:32:00\" |> Maybe.map DateTime.offsetOf" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just Nothing)
@@ -58,7 +58,7 @@ suite =
                             |> Maybe.map DateTime.offsetOf
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:190" <| \_ ->
+            , U.test "toPosix: DateTime.fromString \"1970-01-01T00:00:00Z\" |> Maybe.andThen DateTime.toPosix |> Maybe.map CoreTime.posixToMillis" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just 0)
@@ -67,7 +67,7 @@ suite =
                             |> Maybe.map CoreTime.posixToMillis
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:224" <| \_ ->
+            , U.test "fromPosix: CoreTime.millisToPosix 0 |> DateTime.fromPosix |> Maybe.map DateTime.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "1970-01-01T00:00:00Z")
@@ -76,7 +76,7 @@ suite =
                             |> Maybe.map DateTime.toString
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:281" <| \_ ->
+            , U.test "fromString: DateTime.fromString \"1979-05-27 07:32Z\" |> Maybe.map DateTime.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "1979-05-27T07:32:00Z")
@@ -84,7 +84,7 @@ suite =
                             |> Maybe.map DateTime.toString
                         )
                     )
-            , U.test "src/Civil/DateTime.gren:367" <| \_ ->
+            , U.test "toString: DateTime.fromString \"1987-07-05t17:45:00z\" |> Maybe.map DateTime.toString" <| \_ ->
                 Task.succeed
                     (Expect.equal
                         (Just "1987-07-05T17:45:00Z")
