@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Regenerate tests/src/Conformance.gren from the official TOML test suite.
 
-Walks the date and time directories of ../vendor/toml-test, keeps only the
+Walks the date and time directories of vendor/toml-test, keeps only the
 files listed in the 1.1.0 manifest, and pairs each valid .toml value with the
 expected value from its .json sibling.
 
@@ -23,7 +23,7 @@ import os
 import re
 import sys
 
-TESTS = "../vendor/toml-test/tests"
+TESTS = "vendor/toml-test/tests"
 DIRS = ["datetime", "local-date", "local-time", "local-datetime"]
 KINDS = ("datetime", "datetime-local", "date-local", "time-local")
 

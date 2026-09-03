@@ -68,7 +68,8 @@ this package to remember them.
 
 `tests/src/Dates.gren` and `tests/src/Conformance.gren` are **generated**. Edit
 `tools/gen-dates.py` or `tools/gen-conformance.py` and re-run it from the
-package root, then `gren-format`. Both scripts reproduce their file byte for
+package root, then `gren-format`. `gen-conformance.py` reads `vendor/toml-test`,
+which is a submodule: `git submodule update --init` if the directory is empty. Both scripts reproduce their file byte for
 byte, so a diff after regenerating means the script and the file have drifted.
 
 `tests/src/Clocks.gren` is hand written and covers what the TOML suite does not

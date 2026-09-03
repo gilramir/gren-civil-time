@@ -70,6 +70,7 @@ is not malformed. No arithmetic here pretends to know what it means:
 ## Tests
 
 ```sh
+git clone --recurse-submodules <this repo>
 devbox run test
 ```
 
@@ -80,7 +81,9 @@ range. The parsing is checked against every date and time in the official
 [toml-test](https://github.com/toml-lang/toml-test) suite: 32 that must parse
 and 70 that must not.
 
-Both tables are generated. `tools/gen-dates.py` and `tools/gen-conformance.py`
+Both tables are generated. `tools/gen-dates.py` needs nothing;
+`tools/gen-conformance.py` reads `vendor/toml-test`, a submodule pinned to a
+particular commit so that regenerating twice gives the same file. They
 rewrite their files, and the second one writes the row counts into a guard test
 so that an extractor which quietly stopped finding cases cannot produce a suite
 that passes.
