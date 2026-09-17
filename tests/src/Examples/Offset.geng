@@ -1,6 +1,6 @@
 module Examples.Offset exposing (suite)
 
-{-| The examples in the doc comments of `src/Civil/Offset.gren`, each checked
+{-| The examples in the doc comments of `src/Civil/Offset.geng`, each checked
 against the value it says it gives. An example is an indented block with a
 `-->` in it, and this file is generated from those by `tools/gen-examples.py`.
 

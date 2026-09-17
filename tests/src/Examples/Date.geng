@@ -1,6 +1,6 @@
 module Examples.Date exposing (suite)
 
-{-| The examples in the doc comments of `src/Civil/Date.gren`, each checked
+{-| The examples in the doc comments of `src/Civil/Date.geng`, each checked
 against the value it says it gives. An example is an indented block with a
 `-->` in it, and this file is generated from those by `tools/gen-examples.py`.
 

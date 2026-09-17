@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate tests/src/Examples/*.gren from the doc comments in src/Civil.
+"""Regenerate tests/src/Examples/*.geng from the doc comments in src/Civil.
 
 Every indented block in a doc comment that has a `-->` in it is an example:
 the expression before the arrow is expected to equal the value after it. One
@@ -8,7 +8,7 @@ lines. Each source module gets its own test module, because the examples in
 `Civil.Date` need core's `Time` under that name and the examples in
 `Civil.Time` need `Civil.Time` under it.
 
-The Gren itself lives in tools/templates/Examples.gren. The output is not
+The Gren itself lives in tools/templates/Examples.geng. The output is not
 formatted here; `devbox run gen` runs gren-format over it afterwards.
 
 Run from the package root:  python3 tools/gen-examples.py
@@ -25,22 +25,22 @@ TEMPLATES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates"
 # examples use, and whatever else those examples mention.
 MODULES = [
     {
-        "source": "src/Civil/Date.gren",
+        "source": "src/Civil/Date.geng",
         "module": "Examples.Date",
         "imports": ["import Civil.Date as Date", "import Time"],
     },
     {
-        "source": "src/Civil/Time.gren",
+        "source": "src/Civil/Time.geng",
         "module": "Examples.Time",
         "imports": ["import Civil.Time as Time"],
     },
     {
-        "source": "src/Civil/Offset.gren",
+        "source": "src/Civil/Offset.geng",
         "module": "Examples.Offset",
         "imports": ["import Civil.Offset as Offset"],
     },
     {
-        "source": "src/Civil/DateTime.gren",
+        "source": "src/Civil/DateTime.geng",
         "module": "Examples.DateTime",
         "imports": [
             "import Civil.Date as Date",
@@ -174,7 +174,7 @@ def main():
         keep_trailing_newline=True,
     )
     env.filters["quoted"] = quoted
-    template = env.get_template("Examples.gren")
+    template = env.get_template("Examples.geng")
     os.makedirs("tests/src/Examples", exist_ok=True)
     for spec in MODULES:
         found = examples(spec["source"])
@@ -186,7 +186,7 @@ def main():
             imports=spec["imports"],
             examples=found,
         )
-        out_path = "tests/src/%s.gren" % spec["module"].replace(".", "/")
+        out_path = "tests/src/%s.geng" % spec["module"].replace(".", "/")
         with open(out_path, "w") as out:
             out.write(rendered)
         print("%s: %d examples" % (out_path, len(found)))

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate tests/src/Dates.gren from tools/templates/Dates.gren.
+"""Regenerate tests/src/Dates.geng from tools/templates/Dates.geng.
 
 The forty dates it checks come from Python's datetime, whose toordinal is Rata
 Die on the same epoch. Ten are chosen (the ends of the range, the century rule,
@@ -54,8 +54,8 @@ def main():
         lstrip_blocks=True,
         keep_trailing_newline=True,
     )
-    rendered = env.get_template("Dates.gren").render(rows=rows())
-    with open("tests/src/Dates.gren", "w") as out:
+    rendered = env.get_template("Dates.geng").render(rows=rows())
+    with open("tests/src/Dates.geng", "w") as out:
         out.write(rendered)
 
 

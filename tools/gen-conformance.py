@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Regenerate tests/src/Conformance.gren from the official TOML test suite.
+"""Regenerate tests/src/Conformance.geng from the official TOML test suite.
 
 Walks the date and time directories of vendor/toml-test, keeps only the
 files listed in the 1.1.0 manifest, and pairs each valid .toml value with the
 expected value from its .json sibling. The Gren itself lives in
-tools/templates/Conformance.gren.
+tools/templates/Conformance.geng.
 
 One normalisation is applied to the expected strings, so that the Gren suite
 can compare text and say something useful when it differs: toml-test writes a
@@ -124,8 +124,8 @@ def main():
         keep_trailing_newline=True,
     )
     env.filters["gren_string"] = gren_string
-    rendered = env.get_template("Conformance.gren").render(good=good, bad=bad)
-    with open("tests/src/Conformance.gren", "w") as out:
+    rendered = env.get_template("Conformance.geng").render(good=good, bad=bad)
+    with open("tests/src/Conformance.geng", "w") as out:
         out.write(rendered)
     print("%d valid, %d invalid" % (len(good), len(bad)))
 
