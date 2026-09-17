@@ -1,7 +1,7 @@
 {
     "type": "package",
     "platform": "common",
-    "name": "gilramir/gren-civil-time",
+    "name": "github.com/gilramir/gren-civil-time",
     "summary": "Calendar dates and clock times, with or without an offset from UTC",
     "license": "ISC",
     "version": "1.0.0",
@@ -12,7 +12,5 @@
         "Civil.DateTime"
     ],
     "gren-version": "0.6.0 <= v < 0.7.0",
-    "dependencies": {
-        "gren-lang/core": "7.4.0 <= v < 8.0.0"
-    }
+    "dependencies": {}
 }
