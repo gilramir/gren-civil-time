@@ -81,6 +81,7 @@ import String
 
 {-| A time of day.
 -}
+@derive(Eq, Inspect)
 type Time
     = Time
         { hour : Int

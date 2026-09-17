@@ -4,5 +4,5 @@
 # not in run.sh. See Probe.gren.
 set -e
 cd "$(dirname "$0")"
-gren make Probe --output=probe >/dev/null
+geng make Probe --output=probe >/dev/null
 exec node probe "$@"

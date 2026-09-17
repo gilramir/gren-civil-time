@@ -1,5 +1,11 @@
 # gren-civil-time
 
+**On Geng.** This is the `geng` branch, the port to
+[Geng](https://github.com/gilramir/geng-lang)'s core. The API is unchanged;
+underneath, a moment's milliseconds are an `Int64`, because Geng's
+`Time.posixToMillis` answers one and an `Int` is 32 bits. The test suite passes
+101 of 101 on Geng, as it does on stock Gren, and `tests/probe.sh` passes 3 of 3.
+
 Calendar dates and clock times, with or without an offset from UTC.
 
 Gren's core `Time` module deals in *moments*. A `Posix` is one exact point in

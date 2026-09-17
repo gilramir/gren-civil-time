@@ -18,22 +18,27 @@ import Civil.DateTime as DateTime
 import Civil.Offset as Offset
 import Civil.Time as Time
 import Expect
+import Int64
 import Math
 import Maybe exposing (Maybe(..))
 import Node
 import String
-import Task
+import Task exposing (Task)
 import Test.Runner.UnitNode as U
 import Time as CoreTime
 
 
-main : Node.SimpleProgram a
+main : Task Never {}
 main =
-    U.run
-        { name = "gren-civil-time probe"
-        , version = "1.0.0"
-        , suites = [ probeSuite ]
-        }
+    Node.getEnvironment
+        |> Task.andThen
+            (\env ->
+                U.run env
+                    { name = "gren-civil-time probe"
+                    , version = "1.0.0"
+                    , suites = [ probeSuite ]
+                    }
+            )
 
 
 probeSuite : U.Suite
@@ -103,7 +108,7 @@ nextDay : Day -> Day
 nextDay d =
     let
         stepped =
-            { d | rd = d.rd + 1, yd = d.yd + 1, weekday = Math.modBy 7 (d.weekday + 1) }
+            { d | rd = d.rd + 1, yd = d.yd + 1, weekday = modBy 7 (d.weekday + 1) }
     in
     if d.day < Date.daysInMonth { year = d.year, month = d.month } then
         { stepped | day = d.day + 1 }
@@ -124,7 +129,7 @@ dayAgrees d =
         Just date ->
             let
                 midnight =
-                    (d.rd - 719163) * 86400000
+                    Int64.fromInt (d.rd - 719163) * 86400000
             in
             Date.toRataDie date == d.rd
                 && Date.fromRataDie d.rd == Just date
@@ -164,7 +169,7 @@ secondAgrees : Int -> Bool
 secondAgrees s =
     let
         millis =
-            s * 1000 + 7
+            Int64.fromInt (s * 1000 + 7)
 
         pad n =
             String.padLeft 2 '0' (String.fromInt n)
@@ -173,9 +178,9 @@ secondAgrees s =
             "1970-01-01T"
                 ++ pad (s // 3600)
                 ++ ":"
-                ++ pad (Math.modBy 60 (s // 60))
+                ++ pad (modBy 60 (s // 60))
                 ++ ":"
-                ++ pad (Math.modBy 60 s)
+                ++ pad (modBy 60 s)
                 ++ ".007Z"
 
         written =

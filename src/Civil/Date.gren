@@ -79,6 +79,7 @@ import Time
 Two `Date`s are `==` exactly when they are the same day.
 
 -}
+@derive(Eq, Inspect)
 type Date
     = Date { year : Int, month : Int, day : Int }
 
@@ -257,7 +258,7 @@ monthOf (Date parts) =
 -}
 weekday : Date -> Time.Weekday
 weekday date =
-    when Math.modBy 7 (toRataDie date) is
+    when modBy 7 (toRataDie date) is
         0 ->
             Time.Sun
 
@@ -352,7 +353,7 @@ will not be.
 -}
 isLeapYear : Int -> Bool
 isLeapYear y =
-    Math.modBy 4 y == 0 && (Math.modBy 100 y /= 0 || Math.modBy 400 y == 0)
+    modBy 4 y == 0 && (modBy 100 y /= 0 || modBy 400 y == 0)
 
 
 {-| How many days a month has in a given year.

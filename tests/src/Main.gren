@@ -23,21 +23,26 @@ import Examples.DateTime
 import Examples.Offset
 import Examples.Time
 import Node
+import Task exposing (Task)
 import Test.Runner.UnitNode as U
 
 
-main : Node.SimpleProgram a
+main : Task Never {}
 main =
-    U.run
-        { name = "gren-civil-time"
-        , version = "1.0.0"
-        , suites =
-            [ datesSuite
-            , clocksSuite
-            , conformanceSuite
-            , Examples.Date.suite
-            , Examples.Time.suite
-            , Examples.Offset.suite
-            , Examples.DateTime.suite
-            ]
-        }
+    Node.getEnvironment
+        |> Task.andThen
+            (\env ->
+                U.run env
+                    { name = "gren-civil-time"
+                    , version = "1.0.0"
+                    , suites =
+                        [ datesSuite
+                        , clocksSuite
+                        , conformanceSuite
+                        , Examples.Date.suite
+                        , Examples.Time.suite
+                        , Examples.Offset.suite
+                        , Examples.DateTime.suite
+                        ]
+                    }
+            )

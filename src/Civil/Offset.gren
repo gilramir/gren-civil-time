@@ -69,6 +69,7 @@ import String
 
 {-| An offset from UTC.
 -}
+@derive(Eq, Inspect)
 type Offset
     = Zulu
     | Plus { hours : Int, minutes : Int }

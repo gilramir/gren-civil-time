@@ -73,7 +73,7 @@ import Basics exposing (..)
 import Civil.Date as Date exposing (Date)
 import Civil.Offset as Offset exposing (Offset)
 import Civil.Time as Time exposing (Time)
-import Math
+import Int64
 import Maybe exposing (Maybe(..))
 import String
 import Time as CoreTime
@@ -88,6 +88,7 @@ two different values, just as `Z` and `+00:00` are in
 same moment, compare the results of [`toPosix`](#toPosix).
 
 -}
+@derive(Eq, Inspect)
 type DateTime
     = Local { date : Date, time : Time }
     | Offset { date : Date, time : Time, offset : Offset }
@@ -210,13 +211,15 @@ toPosix dateTime =
 
         Offset parts ->
             let
+                -- In `Int64`, since a count of milliseconds since 1970 passes
+                -- 2^31 twenty-five days in.
                 days =
-                    Date.toRataDie parts.date - 719163
+                    Int64.fromInt (Date.toRataDie parts.date - 719163)
 
                 seconds =
-                    days * 86400 + Time.secondOfDay parts.time - Offset.toMinutes parts.offset * 60
+                    days * 86400 + Int64.fromInt (Time.secondOfDay parts.time - Offset.toMinutes parts.offset * 60)
             in
-            Just (CoreTime.millisToPosix (seconds * 1000 + Time.millisecond parts.time))
+            Just (CoreTime.millisToPosix (seconds * 1000 + Int64.fromInt (Time.millisecond parts.time)))
 
 
 {-| The UTC date-time of a moment, written with a `Z` offset.
@@ -243,17 +246,19 @@ fromPosix posix =
             floorDiv millis 1000
 
         millisPart =
-            millis - totalSeconds * 1000
+            Int64.toInt (millis - totalSeconds * 1000)
 
         days =
             floorDiv totalSeconds 86400
 
         secondsPart =
-            totalSeconds - days * 86400
+            Int64.toInt (totalSeconds - days * 86400)
     in
     Maybe.map2
         (\d t -> Offset { date = d, time = t, offset = Offset.zulu })
-        (Date.fromRataDie (days + 719163))
+        -- A day count past an `Int` is past year 9999 too, so saturating it
+        -- still gives `Nothing`.
+        (Date.fromRataDie (Int64.toInt (days + 719163)))
         (Time.fromParts
             { hour = secondsPart // 3600
             , minute = secondsPart // 60 - (secondsPart // 3600) * 60
@@ -268,9 +273,9 @@ fromPosix posix =
         )
 
 
-floorDiv : Int -> Int -> Int
+floorDiv : Int64 -> Int64 -> Int64
 floorDiv a b =
-    Math.floor (Basics.toFloat a / Basics.toFloat b)
+    (a - modBy b a) // b
 
 
 -- STRINGS
@@ -293,10 +298,10 @@ fromString : String -> Maybe DateTime
 fromString str =
     -- The separator is the 11th character, after a fixed-width YYYY-MM-DD.
     -- Splitting on "T" would be wrong: the offset has no T but a malformed
-    -- string might. Positions here are UTF-16 units, which is what slice,
-    -- takeFirst and dropFirst count in; String.count counts characters and
-    -- would disagree on a string with an astral character in it.
-    if String.unitLength str < 11 then
+    -- string might. Positions here are code points, which is what slice,
+    -- takeFirst, dropFirst and String.count all count in on Geng. (Stock
+    -- Gren's slice counted UTF-16 units, and its String.unitLength with it.)
+    if String.count str < 11 then
         Nothing
 
     else
@@ -358,7 +363,7 @@ splitOffset str =
             else
                 search (index - 1)
     in
-    search (String.unitLength str - 1)
+    search (String.count str - 1)
 
 
 {-| Write an RFC 3339 date-time: `T` between the date and the time, seconds

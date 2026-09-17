@@ -42,6 +42,15 @@ directory on the command line does not recurse into it.
 
 ## The platform facts that govern the implementation
 
+**On the `geng` branch** the facts below are stock Gren's, where the code was
+first written. On Geng an `Int` is 32 bits and wraps, `//` is exact integer
+division, `Time.posixToMillis` answers an `Int64`, and `modBy` is
+`Basics.modBy`. So `DateTime.toPosix` and `fromPosix` count milliseconds in
+`Int64`, and `floorDiv` is `(a - modBy b a) // b` there rather than
+`Math.floor` on a `Float`. String positions count code points, so
+`String.count` is the length that agrees with `slice`. The four types derive
+`Eq` and `Inspect`. Build and test with `geng`.
+
 **Gren's `//` truncates its result to 32 bits.** It is `(a / b) | 0`
 underneath. Every `//` in `Civil.Date` is on a quotient that stays under 2^24 by
 construction — an era, a day of the era, a month index. That is an invariant to

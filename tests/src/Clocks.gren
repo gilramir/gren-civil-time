@@ -413,7 +413,7 @@ edges =
     [ "0001-01-01T00:00:00+05:00", "9999-12-31T23:59:60Z" ]
 
 
-posixOf : String -> Maybe Int
+posixOf : String -> Maybe Int64
 posixOf text =
     DateTime.fromString text
         |> Maybe.andThen DateTime.toPosix
@@ -437,6 +437,6 @@ pieces dt =
 {-| Moments on both sides of the epoch, at the second and inside it, where a
 truncating division would round the wrong way.
 -}
-millis : Array Int
+millis : Array Int64
 millis =
     [ 0, 1, -1, 999, -999, 1000, -1000, 1709210096078, -2208988800000, -62135596800000, 253402300799999 ]
