@@ -1,0 +1,17 @@
+[package]
+name = "github.com/gilramir/gren-civil-time"
+version = "1.0.0"
+summary = "Calendar dates and clock times, with or without an offset from UTC"
+license = "ISC"
+geng = "0.6.0 <= v < 0.7.0"
+
+[platform]
+runtime = "any"
+
+[modules]
+exposed = [
+    "Civil.Date",
+    "Civil.Time",
+    "Civil.Offset",
+    "Civil.DateTime",
+]
