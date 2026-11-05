@@ -288,7 +288,7 @@ weekday date =
 
 -}
 ordinalDay : Date -> Int
-ordinalDay ((Date parts) as date) =
+ordinalDay (Date parts as date) =
     toRataDie date - toRataDie (Date { year = parts.year, month = 1, day = 1 }) + 1
 
 
