@@ -25,6 +25,7 @@ import Examples.Time
 import Node
 import Task exposing (Task)
 import Test.Runner.UnitNode as U
+import Test.Runner.UnitNode.Program as Program
 
 
 main : Task Never {}
@@ -32,7 +33,7 @@ main =
     Node.getEnvironment
         |> Task.andThen
             (\env ->
-                U.run env
+                Program.run env
                     { name = "gren-civil-time"
                     , version = "1.0.0"
                     , suites =

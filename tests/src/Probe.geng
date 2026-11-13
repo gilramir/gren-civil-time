@@ -25,6 +25,7 @@ import Node
 import String
 import Task exposing (Task)
 import Test.Runner.UnitNode as U
+import Test.Runner.UnitNode.Program as Program
 import Time as CoreTime
 
 
@@ -33,7 +34,7 @@ main =
     Node.getEnvironment
         |> Task.andThen
             (\env ->
-                U.run env
+                Program.run env
                     { name = "gren-civil-time probe"
                     , version = "1.0.0"
                     , suites = [ probeSuite ]
