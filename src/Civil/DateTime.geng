@@ -72,6 +72,7 @@ as `CoreTime`. That is how this module itself imports them.
 import Basics exposing (..)
 import Civil.Date as Date exposing (Date)
 import Civil.Offset as Offset exposing (Offset)
+import Civil.Reason as Reason
 import Civil.Time as Time exposing (Time)
 import Int64
 import Maybe exposing (Maybe(..))
@@ -321,13 +322,12 @@ fromString str =
         else
             when Date.fromString dateText is
                 Nothing ->
-                    Nothing
+                    meant Reason.FromOutside Nothing
 
                 Just d ->
                     when splitOffset rest is
                         Nothing ->
-                            Maybe.map (\t -> Local { date = d, time = t })
-                                (Time.fromString rest)
+                            meant Reason.NotGiven (Maybe.map (\t -> Local { date = d, time = t }) (Time.fromString rest))
 
                         Just parts ->
                             Maybe.map2

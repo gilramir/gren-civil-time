@@ -75,6 +75,7 @@ which is some other wall clock at every other offset, so the same second is
 
 import Basics exposing (..)
 import Char
+import Civil.Reason as Reason
 import Maybe exposing (Maybe(..))
 import String
 
@@ -230,11 +231,12 @@ fractionAsInt places (Time parts) =
         0
 
     else
+        -- The fraction is ASCII digits only, which fromParts checks, so
+        -- each one is its code less the code of '0'.
         parts.fraction
             |> String.takeFirst places
             |> String.padRight places '0'
-            |> String.toInt
-            |> Maybe.withDefault 0
+            |> String.foldl (\digit total -> total * 10 + Char.toCode digit - 0x30) 0
 
 
 {-| Seconds since midnight, ignoring the fraction.
@@ -282,7 +284,7 @@ fromString str =
                     }
 
                 Nothing ->
-                    { first = str, rest = "" }
+                    meant Reason.NotGiven { first = str, rest = "" }
 
         fractionOk =
             when dot is
@@ -290,7 +292,7 @@ fromString str =
                     fractionPart /= "" && String.all Char.isDigit fractionPart
 
                 Nothing ->
-                    True
+                    meant Reason.NotGiven True
     in
     if not fractionOk then
         Nothing

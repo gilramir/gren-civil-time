@@ -1,0 +1,13 @@
+module Civil.Reason exposing (Reason(..))
+
+{-| Why a fallback in this package runs: each `meant` names one of these
+(geng-lang `docs/user/checks.md`), and `geng checks` holds every one to
+running and every reason to being used. -}
+
+
+{-| The reasons a `meant` here names. -}
+type Reason
+    = {-| the text being read is not a date, time or offset of the form asked for -}
+      FromOutside
+    | {-| an optional part of the text, a fraction of a second or an offset, is not there, so the value has none -}
+      NotGiven

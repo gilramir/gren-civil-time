@@ -63,6 +63,7 @@ constructors return `Nothing` for anything outside that range.
 
 import Basics exposing (..)
 import Char
+import Civil.Reason as Reason
 import Maybe exposing (Maybe(..))
 import String
 
@@ -284,7 +285,7 @@ fromString str =
                             Nothing
 
             Nothing ->
-                Nothing
+                meant Reason.FromOutside Nothing
 
 
 twoDigits : String -> Maybe Int
